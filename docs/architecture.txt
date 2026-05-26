@@ -1,0 +1,60 @@
+========================================================================================
+                          RESOLV PIPELINE - SYSTEM CONTROL FLOW TOPOLOGY
+========================================================================================
+
+    [ GitHub Webhook / CLI ]
+               │
+               ▼
+   ┌───────────────────────┐
+   │     src/main.py       │ ───( Initializes State )───► [ Pydantic Blackboard State ]
+   │   Execution Ingress   │                                   ▲     ▲     ▲     ▲
+   └───────────────────────┘                                   │     │     │     │
+               │                                               │     │     │     │
+               ▼                                               │     │     │     │
+   ┌───────────────────────┐                                   │     │     │     │
+   │   src/core/graph.py   │                                   │     │     │     │
+   │   LangGraph Engine    │                                   │     │     │     │
+   └───────────────────────┘                                   │     │     │     │
+               │                                               │     │     │     │
+               ▼                                               │     │     │     │
+  ============= LANGRAPH STATEFUL ITERATION LOOP ==============│=====│=====│=====│======
+               │                                               │     │     │     │
+               ├──► [ Node 1: Context Broker ] ────────────────┘     │     │     │
+               │      │ (Ingestion & SCIP Indexing)                  │     │     │
+               │      ├─► [ scip-python Generator ] ─────────────────┤     │     │
+               │      │     (Emits SCIP Protobuf Index for Global    │     │     │
+               │      │      Cross-Reference and Symbol Resolution)  │     │     │
+               │      └─► [ github_client.py ] ──► GitHub API        │     │     │
+               │                                                     │     │     │
+               ├──► [ Node 2: Lead Coder ] ──────────────────────────┘     │     │
+               │      │ (Generates code mutations/patches)                 │     │
+               │      └─► [ llm_inference.py ] ──► Claude 3.5 Sonnet       │     │
+               │                                                           │     │
+               ├──► [ Node 3: CodeRabbit QA ] ─────────────────────────────┘     │
+               │      │ (Validates semantic code changes)                        │
+               │      │                                                          │
+               │      │   ┌─────────────── DOCKER SANDBOX ───────────────┐       │
+               │      └───│─ Mounts local workspace volume               │       │
+               │          │─ Runs subprocess: `coderabbit review`        │       │
+               │          └──────────────────────────────────────────────┘       │
+               │                                                                 │
+               └──► [ Node 4: Test Runner ] ─────────────────────────────────────┘
+                      │ (Executes pytest / native workspace tests)
+                      └─► Runs inside sandboxed container (`docker-py`)
+                                                                
+  ============= CONDITIONAL EDGE ROUTING & EGRESS ======================================
+               │
+               ▼
+     [ Evaluation Gates ]
+               │
+               ├──► [ qa_status == REJECTED ] or [ test_status == FAILED ]
+               │      │
+               │      └─► [ Increment Iteration Count ] ──► (Loop back to Lead Coder)
+               │            * Safety Guardrail: Abort and log if iterations > 5
+               │
+               └──► [ qa_status == APPROVED ] and [ test_status == PASSED ]
+                      │
+                      ▼
+            [ Node 5: Deliver Engine ]
+              │ (Finalizes patch, commits via GitPython)
+              └─► Opens upstream Pull Request via PyGithub
