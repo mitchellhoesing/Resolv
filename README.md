@@ -22,7 +22,7 @@ resolv run --repo owner/name --issue 123
 
 Webhook server:
 ```bash
-uvicorn resolv.webhook:app --host 0.0.0.0 --port 8080
+uvicorn --factory resolv.webhook:create_app --host 0.0.0.0 --port 8080
 ```
 
 ## Test
