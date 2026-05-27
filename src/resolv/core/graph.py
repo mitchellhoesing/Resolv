@@ -7,8 +7,9 @@ The graph wires:
     gate -> coder                                   (loop with feedback, iteration < max)
     gate -> END                                     (stall — LoopStallError logged by caller)
 
-Node functions are injectable to support unit/integration tests that
-need to force specific QA / test outcomes.
+Node functions are required arguments so tests can wire stubs and the
+production builder (`resolv.core.app.build_production_graph`) wires real
+implementations.
 """
 
 from __future__ import annotations
@@ -19,11 +20,6 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from resolv.core.state import BlackboardState
-from resolv.nodes.coder import coder_node
-from resolv.nodes.coderabbit_qa import coderabbit_qa_node
-from resolv.nodes.context_broker import context_broker_node
-from resolv.nodes.deliver import deliver_node
-from resolv.nodes.test_runner import test_runner_node
 
 NodeFn = Callable[[BlackboardState], dict[str, Any]]
 
@@ -44,13 +40,13 @@ def _make_gate_router(max_iterations: int) -> Callable[[BlackboardState], str]:
 
 
 def build_graph(
-    max_iterations: int = 5,
     *,
-    context_broker_fn: NodeFn = context_broker_node,
-    coder_fn: NodeFn = coder_node,
-    coderabbit_qa_fn: NodeFn = coderabbit_qa_node,
-    test_runner_fn: NodeFn = test_runner_node,
-    deliver_fn: NodeFn = deliver_node,
+    context_broker_fn: NodeFn,
+    coder_fn: NodeFn,
+    coderabbit_qa_fn: NodeFn,
+    test_runner_fn: NodeFn,
+    deliver_fn: NodeFn,
+    max_iterations: int = 5,
 ) -> CompiledStateGraph:
     graph: StateGraph = StateGraph(BlackboardState)
 

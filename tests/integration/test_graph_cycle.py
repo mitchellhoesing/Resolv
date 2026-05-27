@@ -8,24 +8,38 @@ from typing import Any
 import pytest
 
 from resolv.core.graph import build_graph
-from resolv.core.state import BlackboardState, IssueRef
+from resolv.core.state import BlackboardState, IssueRef, IterationRecord
+from tests.integration._stub_nodes import (
+    stub_coder,
+    stub_coderabbit_qa,
+    stub_context_broker,
+    stub_deliver,
+    stub_test_runner,
+)
 
 
 @pytest.fixture
 def initial_state(tmp_path: Path) -> BlackboardState:
     issue = IssueRef(
-        owner="acme",
-        repo="widgets",
-        number=1,
-        title="Trigger graph",
-        body="",
-        labels=(),
+        owner="acme", repo="widgets", number=1, title="Trigger graph", body="", labels=()
     )
     return BlackboardState(issue=issue, workspace_path=tmp_path)
 
 
+def _default_wiring(**overrides: Any) -> dict[str, Any]:
+    defaults: dict[str, Any] = {
+        "context_broker_fn": stub_context_broker,
+        "coder_fn": stub_coder,
+        "coderabbit_qa_fn": stub_coderabbit_qa,
+        "test_runner_fn": stub_test_runner,
+        "deliver_fn": stub_deliver,
+    }
+    defaults.update(overrides)
+    return defaults
+
+
 def test_happy_path_reaches_deliver(initial_state: BlackboardState) -> None:
-    app = build_graph(max_iterations=5)
+    app = build_graph(max_iterations=5, **_default_wiring())
     final = app.invoke(initial_state)
 
     assert final["qa_status"] == "APPROVED"
@@ -39,7 +53,7 @@ def test_loop_terminates_on_max_iterations(initial_state: BlackboardState) -> No
     def rejecting_qa(state: BlackboardState) -> dict[str, Any]:
         return {"qa_status": "REJECTED", "qa_findings": ["forced reject"]}
 
-    app = build_graph(max_iterations=3, coderabbit_qa_fn=rejecting_qa)
+    app = build_graph(max_iterations=3, **_default_wiring(coderabbit_qa_fn=rejecting_qa))
     final = app.invoke(initial_state)
 
     assert final["qa_status"] == "REJECTED"
@@ -53,8 +67,6 @@ def test_loop_recovers_after_initial_failures(initial_state: BlackboardState) ->
     def flaky_tests(state: BlackboardState) -> dict[str, Any]:
         call_log.append(state.iteration)
         passed = state.iteration >= 2
-        from resolv.core.state import IterationRecord
-
         record = IterationRecord(
             iteration=state.iteration,
             diff=state.current_diff,
@@ -69,7 +81,7 @@ def test_loop_recovers_after_initial_failures(initial_state: BlackboardState) ->
             "history": [*state.history, record],
         }
 
-    app = build_graph(max_iterations=5, test_runner_fn=flaky_tests)
+    app = build_graph(max_iterations=5, **_default_wiring(test_runner_fn=flaky_tests))
     final = app.invoke(initial_state)
 
     assert final["test_status"] == "PASSED"
