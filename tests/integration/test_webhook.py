@@ -7,7 +7,6 @@ import hashlib
 import hmac
 import json
 
-import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 

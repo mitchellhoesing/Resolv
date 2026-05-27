@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
 from pydantic import SecretStr
 from pytest_mock import MockerFixture
 from typer.testing import CliRunner
