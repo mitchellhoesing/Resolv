@@ -1,0 +1,11 @@
+language: en
+tone_instructions: "Be concise and focus on correctness, security, and adherence to existing patterns."
+reviews:
+  profile: chill
+  auto_review:
+    enabled: true
+    drafts: false
+  path_filters:
+    - "!venv/**"
+    - "!workspaces/**"
+    - "!**/*.lock"
