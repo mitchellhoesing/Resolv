@@ -50,11 +50,14 @@ def build_graph(
 ) -> CompiledStateGraph:
     graph: StateGraph = StateGraph(BlackboardState)
 
-    graph.add_node("context_broker", context_broker_fn)
-    graph.add_node("coder", coder_fn)
-    graph.add_node("coderabbit_qa", coderabbit_qa_fn)
-    graph.add_node("test_runner", test_runner_fn)
-    graph.add_node("deliver", deliver_fn)
+    # LangGraph's add_node has heavily overloaded generic signatures that
+    # don't match a plain Callable[[BlackboardState], dict[str, Any]]; the
+    # calls work at runtime.
+    graph.add_node("context_broker", context_broker_fn)  # type: ignore[call-overload]
+    graph.add_node("coder", coder_fn)  # type: ignore[call-overload]
+    graph.add_node("coderabbit_qa", coderabbit_qa_fn)  # type: ignore[call-overload]
+    graph.add_node("test_runner", test_runner_fn)  # type: ignore[call-overload]
+    graph.add_node("deliver", deliver_fn)  # type: ignore[call-overload]
 
     graph.add_edge(START, "context_broker")
     graph.add_edge("context_broker", "coder")
