@@ -1,0 +1,24 @@
+[coder]
+backend = "claude_code"
+claude_model = "claude-sonnet-4-6"
+litellm_model = "gpt-4o"
+
+[loop]
+max_iterations = 5
+
+[context]
+max_chunks = 20
+
+[delivery]
+base_branch = "main"
+branch_prefix = "resolv/issue-"
+
+[sandbox]
+image_tag = "resolv-sandbox:latest"
+qa_timeout_seconds = 300
+test_timeout_seconds = 600
+
+[webhook]
+trigger_phrase = "/resolv fix"
+host = "0.0.0.0"
+port = 8080
