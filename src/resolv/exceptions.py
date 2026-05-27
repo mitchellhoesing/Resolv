@@ -21,5 +21,9 @@ class DeliveryError(ResolvError):
     """Raised when branch creation, commit, or PR opening fails."""
 
 
+class CoderError(ResolvError):
+    """Raised when a Coder backend cannot produce or apply a valid patch."""
+
+
 class LoopStallError(ResolvError):
     """Raised when the LangGraph loop exceeds max_iterations without converging."""
