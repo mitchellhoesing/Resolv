@@ -1,0 +1,85 @@
+"""Typer-based CLI entrypoint for Resolv.
+
+Example:
+
+    resolv run --repo octocat/Hello-World --issue 1
+    resolv run --repo octocat/Hello-World --issue 1 --backend litellm
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import typer
+
+from resolv.adapters.github_client import GitHubClient
+from resolv.config import Settings, get_settings
+from resolv.core.app import build_production_graph
+from resolv.core.state import BlackboardState
+
+app = typer.Typer(no_args_is_help=True, add_completion=False)
+
+
+@app.callback()
+def _main() -> None:
+    """Resolv — autonomous issue-to-PR pipeline."""
+
+
+@app.command()
+def run(
+    repo: str = typer.Option(..., "--repo", help="Target repository as owner/name."),
+    issue: int = typer.Option(..., "--issue", help="Issue number to resolve."),
+    backend: str | None = typer.Option(
+        None, "--backend", help="Coder backend override: claude_code or litellm."
+    ),
+    workspace_root: Path = typer.Option(
+        Path("./workspaces"),
+        "--workspace-root",
+        help="Directory under which per-issue workspaces are created.",
+    ),
+) -> None:
+    """Run the autonomous issue-to-PR pipeline for a single issue."""
+    if "/" not in repo:
+        typer.echo("error: --repo must be in 'owner/name' form", err=True)
+        raise typer.Exit(2)
+    owner, name = repo.split("/", 1)
+
+    settings = _apply_backend_override(get_settings(), backend)
+    github_client = GitHubClient(settings.github_token)
+    issue_ref = github_client.fetch_issue(owner, name, issue)
+
+    workspace_path = workspace_root / f"{owner}__{name}__issue-{issue}"
+    initial_state = BlackboardState(issue=issue_ref, workspace_path=workspace_path)
+
+    graph = build_production_graph(settings)
+    final_state = graph.invoke(initial_state)
+
+    converged = (
+        final_state.get("qa_status") == "APPROVED"
+        and final_state.get("test_status") == "PASSED"
+    )
+    if converged:
+        typer.echo(final_state.get("test_output") or "PR opened")
+        raise typer.Exit(0)
+    typer.echo(
+        f"Loop did not converge after {final_state.get('iteration', 0)} iterations "
+        f"(qa={final_state.get('qa_status')} test={final_state.get('test_status')})",
+        err=True,
+    )
+    raise typer.Exit(1)
+
+
+def _apply_backend_override(settings: Settings, backend: str | None) -> Settings:
+    if backend is None:
+        return settings
+    if backend not in {"claude_code", "litellm"}:
+        typer.echo(f"error: unknown --backend {backend!r}", err=True)
+        raise typer.Exit(2)
+    return settings.model_copy(
+        update={"coder": settings.coder.model_copy(update={"backend": backend})}
+    )
+
+
+if __name__ == "__main__":
+    sys.exit(app())
