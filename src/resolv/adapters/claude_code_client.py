@@ -18,13 +18,14 @@ from resolv.adapters.coder import render_user_prompt
 from resolv.core.state import ContextChunk, IssueRef
 from resolv.exceptions import CoderError
 
-_DEFAULT_ALLOWED_TOOLS = ("Read", "Write", "Edit", "Bash", "Grep", "Glob")
+_DEFAULT_ALLOWED_TOOLS = ("Read", "Write", "Edit", "Grep", "Glob")
 
 _SYSTEM_PROMPT = (
     "You are Resolv, an autonomous code-fix agent. Read the issue and the "
     "provided code context, explore the workspace as needed, and edit files "
-    "in place to resolve the issue. Run available tests when useful. Make the "
-    "smallest change that addresses the reported problem."
+    "in place to resolve the issue. Make the smallest change that addresses "
+    "the reported problem. Do not attempt to run tests; a separate sandboxed "
+    "test runner will verify your patch."
 )
 
 

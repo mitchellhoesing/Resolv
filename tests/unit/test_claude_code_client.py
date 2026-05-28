@@ -53,6 +53,7 @@ def test_client_run_consumes_messages_and_returns_final_result(
     assert kwargs["model"] == "claude-sonnet-4-6"
     assert kwargs["system_prompt"] == "s"
     assert kwargs["permission_mode"] == "acceptEdits"
+    assert "Bash" not in kwargs["allowed_tools"]
 
 
 def test_backend_invokes_client_with_workspace(
