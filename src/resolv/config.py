@@ -25,7 +25,7 @@ _DEFAULT_TOML = _PROJECT_ROOT / "config" / "settings.toml"
 
 class CoderSettings(BaseModel):
     backend: Literal["claude_code", "litellm"] = "claude_code"
-    claude_model: str = "claude-sonnet-4-6"
+    claude_model: str = "claude-opus-4-7"
     litellm_model: str = "gpt-4o"
 
 

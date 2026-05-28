@@ -55,7 +55,7 @@ class ClaudeCodeClient:
 
 
 class ClaudeCodeBackend:
-    def __init__(self, client: ClaudeCodeClient, *, model: str = "claude-sonnet-4-6") -> None:
+    def __init__(self, client: ClaudeCodeClient, *, model: str) -> None:
         self._client = client
         self._model = model
 

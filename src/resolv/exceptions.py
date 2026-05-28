@@ -25,5 +25,9 @@ class CoderError(ResolvError):
     """Raised when a Coder backend cannot produce or apply a valid patch."""
 
 
+class ConfigError(ResolvError):
+    """Raised when configuration is missing, invalid, or references an unknown option."""
+
+
 class LoopStallError(ResolvError):
     """Raised when the LangGraph loop exceeds max_iterations without converging."""

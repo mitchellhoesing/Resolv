@@ -1,6 +1,6 @@
 [coder]
 backend = "claude_code"
-claude_model = "claude-sonnet-4-6"
+claude_model = "claude-opus-4-7"
 litellm_model = "gpt-4o"
 
 [loop]

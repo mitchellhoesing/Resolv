@@ -87,4 +87,6 @@ def test_backend_wraps_sdk_errors_in_coder_error(
     fake_client.run = boom
 
     with pytest.raises(CoderError, match="sdk crash"):
-        ClaudeCodeBackend(fake_client).generate_patch(issue, tmp_path, [], None)
+        ClaudeCodeBackend(fake_client, model="claude-opus-4-7").generate_patch(
+            issue, tmp_path, [], None
+        )

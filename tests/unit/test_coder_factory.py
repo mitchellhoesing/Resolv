@@ -8,6 +8,7 @@ from resolv.adapters.claude_code_client import ClaudeCodeBackend
 from resolv.adapters.coder import CoderBackend, build_coder, render_user_prompt
 from resolv.adapters.llm_inference import LiteLLMBackend
 from resolv.core.state import ContextChunk, IssueRef
+from resolv.exceptions import ConfigError
 
 
 def test_build_coder_returns_claude_code_backend() -> None:
@@ -23,7 +24,7 @@ def test_build_coder_returns_litellm_backend() -> None:
 
 
 def test_build_coder_rejects_unknown_backend() -> None:
-    with pytest.raises(ValueError, match="Unknown coder backend"):
+    with pytest.raises(ConfigError, match="Unknown coder backend"):
         build_coder("vibes")
 
 
