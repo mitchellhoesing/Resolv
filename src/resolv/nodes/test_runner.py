@@ -8,7 +8,7 @@ from typing import Any, Callable
 from resolv.core.state import BlackboardState, IterationRecord
 from resolv.utils.docker_client import run_in_sandbox
 
-_OUTPUT_TAIL_CHARS = 4000
+_OUTPUT_TAIL_CHARS = 10000
 
 
 def detect_test_command(workspace: Path) -> list[str] | None:
