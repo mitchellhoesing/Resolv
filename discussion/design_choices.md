@@ -88,3 +88,48 @@ what context the coder model should receive, and how much test output we capture
   (the cap is a `str` slice counting characters, not bytes). Committed `1c65f24`.
 - `_OUTPUT_TAIL_CHARS` increased 4000 → 10000 (this session).
 - This design-choices document created.
+
+---
+
+## 2026-05-28 (cont.) — Implemented blame + history into coder context
+
+The "future feature" from the entry above was built. Both signals reach the
+coder through the two shared prompt chokepoints (`render_user_prompt` for
+context, `_compose_feedback` for prior-attempt feedback), so both backends
+(LiteLLM and Claude Code) benefit with no per-backend changes.
+
+### Git blame → context (past changes + their intentions)
+
+- `ast_tools.extract_definitions` now returns a `Definition` NamedTuple carrying
+  1-based `start_line`/`end_line` for each snippet (needed to blame the exact
+  lines).
+- New `utils/git_provenance.py::blame_provenance` runs
+  `git blame --line-porcelain -L start,end -- file`, dedupes to the distinct
+  commits, and returns `"<short-sha> <date> <author> — <summary>"` entries,
+  most-recent first, capped at 3. Best-effort: returns `()` on any git failure
+  (uncommitted file, not a repo) — provenance is never a hard dependency.
+- `ContextChunk` gained a `provenance: tuple[str, ...]` field. The context broker
+  blames only the chunks it actually surfaces (≤ `max_chunks`), not discarded
+  fallbacks, then renders them under "Past changes to these lines (git blame…)".
+
+### state.history → context (what was tried)
+
+- `coder._compose_feedback` was rewritten to enumerate **all** prior
+  `IterationRecord`s (not just the last iteration's scalar fields), each labeled
+  with its attempt number, QA status, test status, the diff that was tried
+  (capped at 2000 chars), QA findings, and failing test output. A header tells
+  the coder these are previous attempts that did not resolve the issue and not to
+  repeat them. This turns the previously write-only `state.history` into a
+  consumed signal.
+
+### Not done / deferred
+
+- Shallow `depth=1` cloning remains deliberately **not** adopted: blame now relies
+  on full local history. If clone footprint becomes a problem, switch to a bounded
+  `depth=N` rather than `depth=1`.
+- `state.record_iteration()` is still dead (test_runner builds the record inline);
+  left untouched as out of scope.
+- Loop-stall / anti-thrashing detection over history is still future work.
+
+Verified: full suite (79 tests) green, ruff and mypy clean, under the project
+venv (Python 3.10).
