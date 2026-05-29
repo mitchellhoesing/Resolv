@@ -8,7 +8,7 @@ from typing import Any, Callable
 from resolv.core.state import BlackboardState, IterationRecord
 from resolv.utils.docker_client import run_in_sandbox
 
-_OUTPUT_TAIL_BYTES = 4000
+_OUTPUT_TAIL_CHARS = 4000
 
 
 def detect_test_command(workspace: Path) -> list[str] | None:
@@ -55,7 +55,7 @@ def make_test_runner_node(
             timeout=timeout,
         )
         status = "PASSED" if result.exit_code == 0 else "FAILED"
-        combined = (result.stdout + result.stderr)[-_OUTPUT_TAIL_BYTES:]
+        combined = (result.stdout + result.stderr)[-_OUTPUT_TAIL_CHARS:]
         return _record_and_return(state, status, combined)
 
     return test_runner_node
