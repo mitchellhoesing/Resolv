@@ -26,6 +26,7 @@ class ContextChunk(BaseModel):
     file_path: str
     symbol: str
     snippet: str
+    provenance: tuple[str, ...] = ()  # git-blame lines: commits that last touched this snippet
 
 
 class IterationRecord(BaseModel):

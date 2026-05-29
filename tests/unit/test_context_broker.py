@@ -17,6 +17,13 @@ def _init_git(path: Path) -> None:
     subprocess.run(["git", "init", "-q"], cwd=str(path), check=True)
 
 
+def _commit_all(path: Path, message: str) -> None:
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=str(path), check=True)
+    subprocess.run(["git", "config", "user.name", "Tester"], cwd=str(path), check=True)
+    subprocess.run(["git", "add", "."], cwd=str(path), check=True)
+    subprocess.run(["git", "commit", "-q", "-m", message], cwd=str(path), check=True)
+
+
 def _state_for(path: Path, title: str = "fix foo", body: str = "") -> BlackboardState:
     issue = IssueRef(owner="a", repo="b", number=1, title=title, body=body, labels=())
     return BlackboardState(issue=issue, workspace_path=path)
@@ -33,6 +40,16 @@ def test_extracts_chunks_whose_symbol_appears_in_issue(tmp_path: Path) -> None:
     assert [c.symbol for c in chunks] == ["foo"]
     assert chunks[0].file_path == "module.py"
     assert "return 1" in chunks[0].snippet
+
+
+def test_attaches_blame_provenance_to_surfaced_chunks(tmp_path: Path) -> None:
+    _init_git(tmp_path)
+    (tmp_path / "module.py").write_bytes(b"def foo():\n    return 1\n")
+    _commit_all(tmp_path, "introduce foo")
+    node = make_context_broker_node(max_chunks=10)
+    chunks = node(_state_for(tmp_path, title="bug in foo"))["pruned_context"]
+    assert chunks[0].provenance  # non-empty
+    assert "introduce foo" in chunks[0].provenance[0]
 
 
 def test_falls_back_to_first_definitions_when_no_name_matches(tmp_path: Path) -> None:
@@ -57,6 +74,35 @@ def test_ignores_venv_and_git_directories(tmp_path: Path) -> None:
     _init_git(tmp_path)
     (tmp_path / "venv").mkdir()
     (tmp_path / "venv" / "noisy.py").write_bytes(b"def foo(): pass\n")
+    (tmp_path / "real.py").write_bytes(b"def foo():\n    return 1\n")
+    node = make_context_broker_node(max_chunks=10)
+    result = node(_state_for(tmp_path, title="foo bug"))
+    files = {c.file_path for c in result["pruned_context"]}
+    assert files == {"real.py"}
+
+
+@pytest.mark.parametrize(
+    "excluded_dir",
+    [".venv", "env", ".env", "virtualenv", ".virtualenv", ".tox"],
+)
+def test_ignores_alternately_named_virtualenvs(
+    tmp_path: Path, excluded_dir: str
+) -> None:
+    _init_git(tmp_path)
+    (tmp_path / excluded_dir).mkdir()
+    (tmp_path / excluded_dir / "noisy.py").write_bytes(b"def foo(): pass\n")
+    (tmp_path / "real.py").write_bytes(b"def foo():\n    return 1\n")
+    node = make_context_broker_node(max_chunks=10)
+    result = node(_state_for(tmp_path, title="foo bug"))
+    files = {c.file_path for c in result["pruned_context"]}
+    assert files == {"real.py"}
+
+
+def test_ignores_site_packages_in_unconventional_venv(tmp_path: Path) -> None:
+    _init_git(tmp_path)
+    site_packages = tmp_path / "weirdname" / "lib" / "python3.12" / "site-packages"
+    site_packages.mkdir(parents=True)
+    (site_packages / "noisy.py").write_bytes(b"def foo(): pass\n")
     (tmp_path / "real.py").write_bytes(b"def foo():\n    return 1\n")
     node = make_context_broker_node(max_chunks=10)
     result = node(_state_for(tmp_path, title="foo bug"))

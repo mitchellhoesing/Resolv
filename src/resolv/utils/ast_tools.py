@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import NamedTuple
+
 import tree_sitter_python
 from tree_sitter import Language, Parser
 
@@ -9,10 +11,18 @@ _PY_LANGUAGE = Language(tree_sitter_python.language())
 _PARSER = Parser(_PY_LANGUAGE)
 
 
-def extract_definitions(source: bytes) -> list[tuple[str, str]]:
-    """Return (symbol_name, snippet) pairs for top-level functions and classes.
+class Definition(NamedTuple):
+    name: str
+    snippet: str
+    start_line: int  # 1-based, inclusive
+    end_line: int  # 1-based, inclusive
 
-    Snippets are the raw source text spanning the definition node.
+
+def extract_definitions(source: bytes) -> list[Definition]:
+    """Return Definitions for top-level functions and classes.
+
+    Snippets are the raw source text spanning the definition node; start_line/
+    end_line are 1-based source line numbers for that span (used for git blame).
     Malformed Python that tree-sitter cannot parse yields an empty list.
     """
     if not source:
@@ -22,7 +32,7 @@ def extract_definitions(source: bytes) -> list[tuple[str, str]]:
     if root.has_error and not root.children:
         return []
 
-    results: list[tuple[str, str]] = []
+    results: list[Definition] = []
     for child in root.children:
         if child.type not in ("function_definition", "class_definition", "decorated_definition"):
             continue
@@ -37,5 +47,7 @@ def extract_definitions(source: bytes) -> list[tuple[str, str]]:
             continue
         name = source[name_node.start_byte : name_node.end_byte].decode("utf-8", errors="replace")
         snippet = source[child.start_byte : child.end_byte].decode("utf-8", errors="replace")
-        results.append((name, snippet))
+        results.append(
+            Definition(name, snippet, child.start_point[0] + 1, child.end_point[0] + 1)
+        )
     return results

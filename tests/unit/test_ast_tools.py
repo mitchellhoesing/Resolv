@@ -15,13 +15,16 @@ def test_extract_top_level_function_and_class() -> None:
         b"        return 2\n"
     )
     defs = extract_definitions(source)
-    names = [name for name, _ in defs]
+    names = [definition.name for definition in defs]
     assert names == ["alpha", "Beta"]
-    alpha_snippet = defs[0][1]
-    beta_snippet = defs[1][1]
+    alpha_snippet = defs[0].snippet
+    beta_snippet = defs[1].snippet
     assert "return x + 1" in alpha_snippet
     assert "class Beta" in beta_snippet
     assert "def method(self):" in beta_snippet
+    # alpha spans lines 1-2; Beta starts at line 4 and spans its body
+    assert (defs[0].start_line, defs[0].end_line) == (1, 2)
+    assert defs[1].start_line == 4 and defs[1].end_line >= 6
 
 
 def test_extract_handles_decorated_definition() -> None:
@@ -31,8 +34,9 @@ def test_extract_handles_decorated_definition() -> None:
         b"    return 1\n"
     )
     defs = extract_definitions(source)
-    assert [name for name, _ in defs] == ["decorated"]
-    assert "@staticmethod" in defs[0][1]
+    assert [definition.name for definition in defs] == ["decorated"]
+    assert "@staticmethod" in defs[0].snippet
+    assert defs[0].start_line == 1  # span includes the decorator
 
 
 def test_extract_ignores_nested_definitions() -> None:
@@ -43,7 +47,7 @@ def test_extract_ignores_nested_definitions() -> None:
         b"    return inner\n"
     )
     defs = extract_definitions(source)
-    assert [name for name, _ in defs] == ["outer"]
+    assert [definition.name for definition in defs] == ["outer"]
 
 
 def test_extract_empty_source_returns_empty_list() -> None:

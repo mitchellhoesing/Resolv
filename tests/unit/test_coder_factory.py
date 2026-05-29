@@ -42,6 +42,22 @@ def test_render_user_prompt_includes_issue_and_context() -> None:
     assert "prior attempt missed line 4" in prompt
 
 
+def test_render_user_prompt_includes_blame_provenance() -> None:
+    issue = IssueRef(owner="a", repo="b", number=7, title="Boom", body="x", labels=())
+    context = [
+        ContextChunk(
+            file_path="src/x.py",
+            symbol="foo",
+            snippet="def foo(): ...",
+            provenance=("abc12345 2024-01-02 Alice — fix off-by-one",),
+        )
+    ]
+    prompt = render_user_prompt(issue, context, prior_feedback=None)
+
+    assert "Past changes to these lines" in prompt
+    assert "abc12345 2024-01-02 Alice — fix off-by-one" in prompt
+
+
 def test_render_user_prompt_handles_empty_body_and_context() -> None:
     issue = IssueRef(owner="a", repo="b", number=1, title="t", body="", labels=())
     prompt = render_user_prompt(issue, [], None)

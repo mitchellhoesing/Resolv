@@ -64,7 +64,12 @@ def render_user_prompt(
     ]
     if pruned_context:
         for chunk in pruned_context:
-            sections.append(f"\n### {chunk.file_path} :: {chunk.symbol}\n```\n{chunk.snippet}\n```")
+            block = f"\n### {chunk.file_path} :: {chunk.symbol}\n```\n{chunk.snippet}\n```"
+            if chunk.provenance:
+                block += "\nPast changes to these lines (git blame, most recent first):\n" + "\n".join(
+                    f"- {entry}" for entry in chunk.provenance
+                )
+            sections.append(block)
     else:
         sections.append("(none extracted)")
     if prior_feedback:
