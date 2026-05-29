@@ -1,15 +1,27 @@
 # Resolv — End-to-End Implementation Plan
 
+> **ARCHITECTURE UPDATE (supersedes parts of this plan).** The execution model was
+> later inverted: the **whole pipeline now runs inside one disposable per-issue
+> container** (clone, context broker, coder, tests, push), not "coder on host +
+> Docker for QA/tests." **CodeRabbit was removed as a pipeline gate** — it now runs in
+> the cloud on the pushed PR — so `qa_status`/`qa_findings`, the `coderabbit_qa` node,
+> and `QAGateError` no longer exist, and the gate converges on `test_status == PASSED`
+> alone. The nested-container `run_in_sandbox` is replaced by `utils/sandbox.py`, which
+> runs the untrusted test suite as an in-process child under `unshare --net` with a
+> scrubbed env (requires `--cap-add=SYS_ADMIN`). SCIP indexing was never built; the
+> broker is tree-sitter only (plus git-blame provenance). The sections below are
+> retained as historical context; where they conflict with this note, this note wins.
+
 ## Context
 
 Resolv is greenfield: only `.claude/claude.md` and `docs/architecture.txt` exist. The goal is to build the full autonomous loop described in those documents — an agent that ingests a GitHub issue, locates the defect, generates and verifies a patch through a CodeRabbit QA gate + tests in a Docker sandbox, and opens a PR. This plan covers the full end-to-end system.
 
 **Decisions locked in:**
 - Target repos: **Python only** (scip-python indexer, tree-sitter Python grammar).
-- Triggers: **CLI + GitHub webhook server** (FastAPI).
-- CodeRabbit QA: **hard gate**. CLI installed inside the sandbox image; rejection blocks delivery.
-- Coder: **selectable backend** — Claude Code (Agent SDK on host) *or* LiteLLM, chosen via `settings.toml`.
-- Coder runs on **host**; CodeRabbit + tests run **inside Docker**, both mounted on the same per-issue workspace directory.
+- Triggers: **CLI + GitHub webhook server** (FastAPI). Both launch a per-issue container.
+- CodeRabbit QA: **removed from the pipeline** — runs in the cloud on the pushed PR (see update banner).
+- Coder: **selectable backend** — Claude Code (Agent SDK) *or* LiteLLM, chosen via `settings.toml`.
+- Whole pipeline runs **inside one disposable per-issue container**; only the untrusted test suite is network-isolated in-process via `unshare --net` (see update banner).
 - Test runner: detect **pytest → tox → unittest** and dispatch accordingly.
 
 ## Architecture
@@ -21,13 +33,13 @@ Resolv is greenfield: only `.claude/claude.md` and `docs/architecture.txt` exist
 
 ### Graph topology (LangGraph)
 ```
-ingress -> context_broker -> coder -> coderabbit_qa -> test_runner -> gate
+ingress -> context_broker -> coder -> test_runner -> gate
 gate:
-  if qa_status == APPROVED and test_status == PASSED -> deliver -> END
+  if test_status == PASSED -> deliver -> END
   elif iteration < max_iterations -> coder (loop, with feedback)
   else -> END (LoopStallError logged)
 ```
-**Context Broker runs once at ingress**, not in the loop — indexing is expensive and the symbol graph doesn't change meaningfully between Coder attempts. The loop body is Coder → QA → Tests.
+**Context Broker runs once at ingress**, not in the loop — ingestion is expensive and the context doesn't change meaningfully between Coder attempts. The loop body is Coder → Tests.
 
 ### State (Blackboard)
 `src/resolv/core/state.py`: Pydantic V2 model with frozen sub-models where possible. Fields:
