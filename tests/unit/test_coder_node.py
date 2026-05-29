@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from resolv.core.state import BlackboardState, IssueRef
+from resolv.core.state import BlackboardState, IssueRef, IterationRecord
 from resolv.nodes.coder import make_coder_node
 
 
@@ -70,21 +70,25 @@ def test_subsequent_iteration_resets_workspace_and_passes_feedback(repo: Path) -
     backend = MagicMock()
     backend.generate_patch.side_effect = capture
 
-    state = _state(
-        repo,
+    prior_attempt = IterationRecord(
         iteration=1,
-        qa_findings=["missing docstring", "long line"],
+        diff="--- a/f.py\n+++ b/f.py\n@@\n-a = 1\n+a = 99\n",
+        qa_status="REJECTED",
+        qa_findings=("missing docstring", "long line"),
         test_status="FAILED",
         test_output="3 failed",
     )
+    state = _state(repo, iteration=1, history=[prior_attempt])
     node = make_coder_node(backend)
     result = node(state)
 
     assert captured["stray_exists"] is False  # workspace was cleaned
     feedback = captured["prior_feedback"]
     assert isinstance(feedback, str)
+    assert "previous attempts" in feedback  # labeled as past attempts
     assert "missing docstring" in feedback
     assert "3 failed" in feedback
+    assert "+a = 99" in feedback  # the prior diff is shown so it is not repeated
     assert result["iteration"] == 2
     assert "+a = 3" in result["current_diff"]
 

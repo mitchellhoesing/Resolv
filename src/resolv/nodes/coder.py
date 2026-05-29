@@ -37,15 +37,30 @@ def make_coder_node(
     return coder_node
 
 
+_DIFF_CAP = 2000
+
+
 def _compose_feedback(state: BlackboardState) -> str | None:
-    if state.iteration == 0:
+    if not state.history:
         return None
-    parts: list[str] = []
-    if state.qa_findings:
-        parts.append("QA findings:\n" + "\n".join(state.qa_findings))
-    if state.test_status == "FAILED" and state.test_output:
-        parts.append("Test output:\n" + state.test_output)
-    return "\n\n".join(parts) if parts else None
+    header = (
+        "These are your previous attempts to fix this issue, in order. Each was "
+        "applied to the workspace and did NOT resolve it — review what was changed "
+        "and why it failed, and do not repeat the same approach."
+    )
+    blocks: list[str] = []
+    for record in state.history:
+        lines = [
+            f"### Attempt {record.iteration} — QA {record.qa_status}, tests {record.test_status}"
+        ]
+        if record.diff:
+            lines.append("Diff that was tried:\n```diff\n" + record.diff[:_DIFF_CAP] + "\n```")
+        if record.qa_findings:
+            lines.append("QA findings:\n" + "\n".join(f"- {finding}" for finding in record.qa_findings))
+        if record.test_status == "FAILED" and record.test_output:
+            lines.append("Test output:\n" + record.test_output)
+        blocks.append("\n".join(lines))
+    return header + "\n\n" + "\n\n".join(blocks)
 
 
 def _reset_workspace(workspace: Path) -> None:
