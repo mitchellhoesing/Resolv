@@ -9,9 +9,10 @@ import json
 
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
+from pytest_mock import MockerFixture
 
 from resolv.config import Settings
-from resolv.webhook import create_app, should_process, verify_signature
+from resolv.webhook import _default_runner, create_app, should_process, verify_signature
 
 SECRET = "shhh"
 
@@ -149,6 +150,27 @@ def test_unsupported_event_is_ignored() -> None:
         )
     assert response.status_code == 200
     assert response.json() == {"status": "ignored"}
+
+
+def test_default_runner_dispatches_per_issue_container(mocker: MockerFixture) -> None:
+    settings = Settings(
+        github_token=SecretStr("ghp_secret"),
+        anthropic_api_key=SecretStr("sk-secret"),
+    )
+    run_mock = mocker.patch("resolv.webhook.subprocess.run")
+
+    runner = _default_runner(settings)
+    asyncio.run(runner(("acme", "widgets", 7)))
+
+    run_mock.assert_called_once()
+    command, kwargs = run_mock.call_args.args[0], run_mock.call_args.kwargs
+    assert command[:4] == ["docker", "run", "--rm", "--cap-add=SYS_ADMIN"]
+    assert "resolv-sandbox:latest" in command
+    assert command[-5:] == ["run", "--repo", "acme/widgets", "--issue", "7"]
+    # Secrets are passed through env, never on the argv.
+    assert "ghp_secret" not in command
+    assert kwargs["env"]["RESOLV_GITHUB_TOKEN"] == "ghp_secret"
+    assert kwargs["env"]["RESOLV_ANTHROPIC_API_KEY"] == "sk-secret"
 
 
 def test_worker_consumes_queue_and_invokes_runner() -> None:

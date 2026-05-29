@@ -3,8 +3,8 @@
 A factory-built FastAPI app verifies HMAC signatures, filters events
 to actionable issues (`issues.opened` and `issue_comment.created`
 matching the trigger phrase), and enqueues an `(owner, repo, number)`
-tuple onto an in-process `asyncio.Queue`. A single background worker
-consumes the queue and drives `build_production_graph` to completion.
+tuple onto an in-process `asyncio.Queue`. A single background worker consumes the queue and, for each item, launches a
+disposable per-issue container that runs the whole pipeline (`resolv run`).
 
 Run with: `uvicorn --factory resolv.webhook:create_app`
 """
@@ -16,16 +16,14 @@ import hashlib
 import hmac
 import json
 import logging
+import os
+import subprocess
 from contextlib import asynccontextmanager
-from pathlib import Path
 from typing import Any, Awaitable, Callable
 
 from fastapi import FastAPI, Header, HTTPException, Request
 
-from resolv.adapters.github_client import GitHubClient
 from resolv.config import Settings, get_settings
-from resolv.core.app import build_production_graph
-from resolv.core.state import BlackboardState
 
 logger = logging.getLogger(__name__)
 
@@ -57,15 +55,33 @@ def _extract_work_item(payload: dict[str, Any]) -> WorkItem:
     return (repo["owner"]["login"], repo["name"], issue["number"])
 
 
-def _default_runner(settings: Settings, workspace_root: Path) -> Runner:
+def _default_runner(settings: Settings) -> Runner:
+    """Dispatch each issue to its own disposable container running `resolv run`.
+
+    Secrets are passed through by name (`-e NAME`, no value) so they reach the
+    container's env without appearing in the host process's argv. The container
+    fetches the issue, clones, codes, tests, and pushes — the host only launches
+    it. CAP_SYS_ADMIN is required for the in-container test isolation.
+    """
+    image_tag = settings.sandbox.image_tag
+
     async def run(item: WorkItem) -> None:
         owner, repo, number = item
-        github = GitHubClient(settings.github_token)
-        issue_ref = github.fetch_issue(owner, repo, number)
-        workspace = workspace_root / f"{owner}__{repo}__issue-{number}"
-        state = BlackboardState(issue=issue_ref, workspace_path=workspace)
-        graph = build_production_graph(settings)
-        await asyncio.to_thread(graph.invoke, state)
+        command = [
+            "docker", "run", "--rm", "--cap-add=SYS_ADMIN",
+            "-e", "RESOLV_GITHUB_TOKEN",
+            "-e", "RESOLV_ANTHROPIC_API_KEY",
+            "-e", "RESOLV_OPENAI_API_KEY",
+            image_tag,
+            "run", "--repo", f"{owner}/{repo}", "--issue", str(number),
+        ]
+        env = {
+            **os.environ,
+            "RESOLV_GITHUB_TOKEN": settings.github_token.get_secret_value(),
+            "RESOLV_ANTHROPIC_API_KEY": settings.anthropic_api_key.get_secret_value(),
+            "RESOLV_OPENAI_API_KEY": settings.openai_api_key.get_secret_value(),
+        }
+        await asyncio.to_thread(subprocess.run, command, env=env, check=False)
 
     return run
 
@@ -85,11 +101,10 @@ def create_app(
     settings: Settings | None = None,
     *,
     runner: Runner | None = None,
-    workspace_root: Path = Path("./workspaces"),
     start_worker: bool = True,
 ) -> FastAPI:
     resolved_settings = settings or get_settings()
-    resolved_runner = runner or _default_runner(resolved_settings, workspace_root)
+    resolved_runner = runner or _default_runner(resolved_settings)
     queue: asyncio.Queue[WorkItem] = asyncio.Queue()
 
     @asynccontextmanager
