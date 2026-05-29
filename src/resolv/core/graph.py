@@ -2,8 +2,8 @@
 
 The graph wires:
 
-    START -> context_broker -> coder -> coderabbit_qa -> test_runner -> gate
-    gate -> deliver -> END                          (QA APPROVED and tests PASSED)
+    START -> context_broker -> coder -> test_runner -> gate
+    gate -> deliver -> END                          (tests PASSED)
     gate -> coder                                   (loop with feedback, iteration < max)
     gate -> END                                     (stall — LoopStallError logged by caller)
 
@@ -30,7 +30,7 @@ GATE_STALL = "stall"
 
 def _make_gate_router(max_iterations: int) -> Callable[[BlackboardState], str]:
     def gate_router(state: BlackboardState) -> str:
-        if state.qa_status == "APPROVED" and state.test_status == "PASSED":
+        if state.test_status == "PASSED":
             return GATE_DELIVER
         if state.iteration >= max_iterations:
             return GATE_STALL
@@ -43,7 +43,6 @@ def build_graph(
     *,
     context_broker_fn: NodeFn,
     coder_fn: NodeFn,
-    coderabbit_qa_fn: NodeFn,
     test_runner_fn: NodeFn,
     deliver_fn: NodeFn,
     max_iterations: int = 5,
@@ -55,14 +54,12 @@ def build_graph(
     # calls work at runtime.
     graph.add_node("context_broker", context_broker_fn)  # type: ignore[call-overload]
     graph.add_node("coder", coder_fn)  # type: ignore[call-overload]
-    graph.add_node("coderabbit_qa", coderabbit_qa_fn)  # type: ignore[call-overload]
     graph.add_node("test_runner", test_runner_fn)  # type: ignore[call-overload]
     graph.add_node("deliver", deliver_fn)  # type: ignore[call-overload]
 
     graph.add_edge(START, "context_broker")
     graph.add_edge("context_broker", "coder")
-    graph.add_edge("coder", "coderabbit_qa")
-    graph.add_edge("coderabbit_qa", "test_runner")
+    graph.add_edge("coder", "test_runner")
     graph.add_conditional_edges(
         "test_runner",
         _make_gate_router(max_iterations),

@@ -15,7 +15,6 @@ branch_prefix = "resolv/issue-"
 
 [sandbox]
 image_tag = "resolv-sandbox:latest"
-qa_timeout_seconds = 300
 test_timeout_seconds = 600
 
 [webhook]

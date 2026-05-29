@@ -19,23 +19,15 @@ def stub_coder(state: BlackboardState) -> dict[str, Any]:
     return {
         "current_diff": "--- a/stub\n+++ b/stub\n",
         "iteration": state.iteration + 1,
-        "qa_status": "PENDING",
-        "qa_findings": [],
         "test_status": "PENDING",
         "test_output": None,
     }
-
-
-def stub_coderabbit_qa(state: BlackboardState) -> dict[str, Any]:
-    return {"qa_status": "APPROVED", "qa_findings": []}
 
 
 def stub_test_runner(state: BlackboardState) -> dict[str, Any]:
     record = IterationRecord(
         iteration=state.iteration,
         diff=state.current_diff,
-        qa_status=state.qa_status,
-        qa_findings=tuple(state.qa_findings),
         test_status="PASSED",
         test_output="stub: 0 passed",
     )

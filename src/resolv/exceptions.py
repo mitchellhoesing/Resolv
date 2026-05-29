@@ -10,11 +10,7 @@ class IngestionError(ResolvError):
 
 
 class SandboxError(ResolvError):
-    """Raised when a Docker sandbox execution fails or times out."""
-
-
-class QAGateError(ResolvError):
-    """Raised when the CodeRabbit QA gate cannot be evaluated."""
+    """Raised when isolated test execution cannot be launched."""
 
 
 class DeliveryError(ResolvError):

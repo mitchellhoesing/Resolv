@@ -9,7 +9,7 @@ import pytest
 
 from resolv.core.state import BlackboardState, IssueRef
 from resolv.nodes.test_runner import detect_test_command, make_test_runner_node
-from resolv.utils.docker_client import SandboxResult
+from resolv.utils.sandbox import SandboxResult
 
 
 @pytest.fixture
@@ -46,7 +46,7 @@ def test_no_detection_returns_none(tmp_path: Path) -> None:
 
 def test_node_marks_failed_when_no_framework(state: BlackboardState) -> None:
     runner = MagicMock()
-    node = make_test_runner_node(image_tag="x", timeout=1, sandbox_runner=runner)
+    node = make_test_runner_node(timeout=1, sandbox_runner=runner)
     result = node(state)
     assert result["test_status"] == "FAILED"
     assert "no test runner detected" in result["test_output"]
@@ -59,13 +59,12 @@ def test_node_marks_passed_on_zero_exit(state: BlackboardState) -> None:
     runner = MagicMock(
         return_value=SandboxResult(exit_code=0, stdout="3 passed", stderr="")
     )
-    node = make_test_runner_node(image_tag="resolv:latest", timeout=60, sandbox_runner=runner)
+    node = make_test_runner_node(timeout=60, sandbox_runner=runner)
     result = node(state)
     assert result["test_status"] == "PASSED"
     assert "3 passed" in result["test_output"]
     runner.assert_called_once()
     call_kwargs = runner.call_args.kwargs
-    assert call_kwargs["image_tag"] == "resolv:latest"
     assert call_kwargs["timeout"] == 60
 
 
@@ -74,7 +73,7 @@ def test_node_marks_failed_on_nonzero_exit(state: BlackboardState) -> None:
     runner = MagicMock(
         return_value=SandboxResult(exit_code=1, stdout="2 failed", stderr="trace")
     )
-    node = make_test_runner_node(image_tag="x", timeout=60, sandbox_runner=runner)
+    node = make_test_runner_node(timeout=60, sandbox_runner=runner)
     result = node(state)
     assert result["test_status"] == "FAILED"
     assert "2 failed" in result["test_output"]

@@ -34,9 +34,9 @@ def run(
         None, "--backend", help="Coder backend override: claude_code or litellm."
     ),
     workspace_root: Path = typer.Option(
-        Path("./workspaces"),
+        Path("/workspace"),
         "--workspace-root",
-        help="Directory under which per-issue workspaces are created.",
+        help="Directory under which per-issue workspaces are created (in-container default).",
     ),
 ) -> None:
     """Run the autonomous issue-to-PR pipeline for a single issue."""
@@ -55,16 +55,12 @@ def run(
     graph = build_production_graph(settings)
     final_state = graph.invoke(initial_state)
 
-    converged = (
-        final_state.get("qa_status") == "APPROVED"
-        and final_state.get("test_status") == "PASSED"
-    )
-    if converged:
+    if final_state.get("test_status") == "PASSED":
         typer.echo(final_state.get("test_output") or "PR opened")
         raise typer.Exit(0)
     typer.echo(
         f"Loop did not converge after {final_state.get('iteration', 0)} iterations "
-        f"(qa={final_state.get('qa_status')} test={final_state.get('test_status')})",
+        f"(test={final_state.get('test_status')})",
         err=True,
     )
     raise typer.Exit(1)

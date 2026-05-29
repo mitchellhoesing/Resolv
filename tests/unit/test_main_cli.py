@@ -44,7 +44,6 @@ def test_cli_success_path_reports_pr_url(mocker: MockerFixture) -> None:
     mocker.patch("resolv.main.GitHubClient", return_value=github)
     graph = MagicMock()
     graph.invoke.return_value = {
-        "qa_status": "APPROVED",
         "test_status": "PASSED",
         "test_output": "PR opened: https://github.com/a/b/pull/9",
         "iteration": 1,
@@ -65,8 +64,7 @@ def test_cli_stall_path_exits_nonzero(mocker: MockerFixture) -> None:
     mocker.patch("resolv.main.GitHubClient", return_value=github)
     graph = MagicMock()
     graph.invoke.return_value = {
-        "qa_status": "REJECTED",
-        "test_status": "PENDING",
+        "test_status": "FAILED",
         "iteration": 5,
     }
     mocker.patch("resolv.main.build_production_graph", return_value=graph)
@@ -85,7 +83,6 @@ def test_cli_backend_override_propagates(mocker: MockerFixture) -> None:
     mocker.patch("resolv.main.GitHubClient", return_value=github)
     build = mocker.patch("resolv.main.build_production_graph")
     build.return_value.invoke.return_value = {
-        "qa_status": "APPROVED",
         "test_status": "PASSED",
         "test_output": "ok",
         "iteration": 1,

@@ -51,7 +51,6 @@ def test_first_iteration_skips_reset_and_captures_diff(repo: Path) -> None:
     assert result["iteration"] == 1
     assert "-a = 1" in result["current_diff"]
     assert "+a = 2" in result["current_diff"]
-    assert result["qa_status"] == "PENDING"
     assert result["test_status"] == "PENDING"
     backend.generate_patch.assert_called_once()
     kwargs = backend.generate_patch.call_args.kwargs
@@ -73,8 +72,6 @@ def test_subsequent_iteration_resets_workspace_and_passes_feedback(repo: Path) -
     prior_attempt = IterationRecord(
         iteration=1,
         diff="--- a/f.py\n+++ b/f.py\n@@\n-a = 1\n+a = 99\n",
-        qa_status="REJECTED",
-        qa_findings=("missing docstring", "long line"),
         test_status="FAILED",
         test_output="3 failed",
     )
@@ -86,7 +83,6 @@ def test_subsequent_iteration_resets_workspace_and_passes_feedback(repo: Path) -
     feedback = captured["prior_feedback"]
     assert isinstance(feedback, str)
     assert "previous attempts" in feedback  # labeled as past attempts
-    assert "missing docstring" in feedback
     assert "3 failed" in feedback
     assert "+a = 99" in feedback  # the prior diff is shown so it is not repeated
     assert result["iteration"] == 2
@@ -103,5 +99,5 @@ def test_iteration_without_feedback_passes_none(repo: Path) -> None:
     backend.generate_patch.side_effect = capture
 
     node = make_coder_node(backend)
-    node(_state(repo, iteration=1, qa_findings=[], test_status="PASSED", test_output=None))
+    node(_state(repo, iteration=1, test_status="PASSED", test_output=None))
     assert captured["prior_feedback"] is None

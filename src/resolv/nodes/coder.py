@@ -28,8 +28,6 @@ def make_coder_node(
         return {
             "current_diff": diff,
             "iteration": state.iteration + 1,
-            "qa_status": "PENDING",
-            "qa_findings": [],
             "test_status": "PENDING",
             "test_output": None,
         }
@@ -50,13 +48,9 @@ def _compose_feedback(state: BlackboardState) -> str | None:
     )
     blocks: list[str] = []
     for record in state.history:
-        lines = [
-            f"### Attempt {record.iteration} — QA {record.qa_status}, tests {record.test_status}"
-        ]
+        lines = [f"### Attempt {record.iteration} — tests {record.test_status}"]
         if record.diff:
             lines.append("Diff that was tried:\n```diff\n" + record.diff[:_DIFF_CAP] + "\n```")
-        if record.qa_findings:
-            lines.append("QA findings:\n" + "\n".join(f"- {finding}" for finding in record.qa_findings))
         if record.test_status == "FAILED" and record.test_output:
             lines.append("Test output:\n" + record.test_output)
         blocks.append("\n".join(lines))

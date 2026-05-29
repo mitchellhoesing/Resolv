@@ -11,7 +11,6 @@ from resolv.core.graph import build_graph
 from resolv.core.state import BlackboardState, IssueRef, IterationRecord
 from tests.integration._stub_nodes import (
     stub_coder,
-    stub_coderabbit_qa,
     stub_context_broker,
     stub_deliver,
     stub_test_runner,
@@ -30,7 +29,6 @@ def _default_wiring(**overrides: Any) -> dict[str, Any]:
     defaults: dict[str, Any] = {
         "context_broker_fn": stub_context_broker,
         "coder_fn": stub_coder,
-        "coderabbit_qa_fn": stub_coderabbit_qa,
         "test_runner_fn": stub_test_runner,
         "deliver_fn": stub_deliver,
     }
@@ -42,7 +40,6 @@ def test_happy_path_reaches_deliver(initial_state: BlackboardState) -> None:
     app = build_graph(max_iterations=5, **_default_wiring())
     final = app.invoke(initial_state)
 
-    assert final["qa_status"] == "APPROVED"
     assert final["test_status"] == "PASSED"
     assert final["iteration"] == 1
     assert len(final["history"]) == 1
@@ -50,13 +47,23 @@ def test_happy_path_reaches_deliver(initial_state: BlackboardState) -> None:
 
 
 def test_loop_terminates_on_max_iterations(initial_state: BlackboardState) -> None:
-    def rejecting_qa(state: BlackboardState) -> dict[str, Any]:
-        return {"qa_status": "REJECTED", "qa_findings": ["forced reject"]}
+    def failing_tests(state: BlackboardState) -> dict[str, Any]:
+        record = IterationRecord(
+            iteration=state.iteration,
+            diff=state.current_diff,
+            test_status="FAILED",
+            test_output="forced failure",
+        )
+        return {
+            "test_status": "FAILED",
+            "test_output": "forced failure",
+            "history": [*state.history, record],
+        }
 
-    app = build_graph(max_iterations=3, **_default_wiring(coderabbit_qa_fn=rejecting_qa))
+    app = build_graph(max_iterations=3, **_default_wiring(test_runner_fn=failing_tests))
     final = app.invoke(initial_state)
 
-    assert final["qa_status"] == "REJECTED"
+    assert final["test_status"] == "FAILED"
     assert final["iteration"] == 3
     assert len(final["history"]) == 3
 
@@ -70,8 +77,6 @@ def test_loop_recovers_after_initial_failures(initial_state: BlackboardState) ->
         record = IterationRecord(
             iteration=state.iteration,
             diff=state.current_diff,
-            qa_status=state.qa_status,
-            qa_findings=tuple(state.qa_findings),
             test_status="PASSED" if passed else "FAILED",
             test_output="ok" if passed else "boom",
         )

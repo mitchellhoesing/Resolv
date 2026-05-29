@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from resolv.core.state import BlackboardState, IterationRecord
-from resolv.utils.docker_client import run_in_sandbox
+from resolv.utils.sandbox import run_isolated
 
 _OUTPUT_TAIL_CHARS = 10000
 
@@ -40,9 +40,8 @@ def detect_test_command(workspace: Path) -> list[str] | None:
 
 def make_test_runner_node(
     *,
-    image_tag: str,
     timeout: int,
-    sandbox_runner: Callable[..., Any] = run_in_sandbox,
+    sandbox_runner: Callable[..., Any] = run_isolated,
 ) -> Callable[[BlackboardState], dict[str, Any]]:
     def test_runner_node(state: BlackboardState) -> dict[str, Any]:
         command = detect_test_command(state.workspace_path)
@@ -51,7 +50,6 @@ def make_test_runner_node(
         result = sandbox_runner(
             command,
             state.workspace_path,
-            image_tag=image_tag,
             timeout=timeout,
         )
         status = "PASSED" if result.exit_code == 0 else "FAILED"
@@ -67,8 +65,6 @@ def _record_and_return(
     record = IterationRecord(
         iteration=state.iteration,
         diff=state.current_diff,
-        qa_status=state.qa_status,
-        qa_findings=tuple(state.qa_findings),
         test_status=status,  # type: ignore[arg-type]
         test_output=output,
     )
