@@ -60,7 +60,7 @@ def render_user_prompt(
         "",
         issue.body or "(no body provided)",
         "",
-        "## Relevant code context",
+        "## Candidate starting points (may be irrelevant; verify before relying on these)",
     ]
     if pruned_context:
         for chunk in pruned_context:

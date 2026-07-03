@@ -52,13 +52,12 @@ def test_attaches_blame_provenance_to_surfaced_chunks(tmp_path: Path) -> None:
     assert "introduce foo" in chunks[0].provenance[0]
 
 
-def test_falls_back_to_first_definitions_when_no_name_matches(tmp_path: Path) -> None:
+def test_returns_no_context_when_no_name_matches(tmp_path: Path) -> None:
     _init_git(tmp_path)
     (tmp_path / "m.py").write_bytes(b"def alpha():\n    pass\n\ndef beta():\n    pass\n")
     node = make_context_broker_node(max_chunks=10)
     result = node(_state_for(tmp_path, title="unrelated title", body=""))
-    names = [c.symbol for c in result["pruned_context"]]
-    assert "alpha" in names and "beta" in names
+    assert result["pruned_context"] == []
 
 
 def test_respects_max_chunks(tmp_path: Path) -> None:

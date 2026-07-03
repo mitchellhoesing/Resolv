@@ -27,6 +27,9 @@ htmlcov/
 # Resolv runtime state
 workspaces/
 
+# Local notes
+TODO.md
+
 # Editors / OS
 .idea/
 .vscode/

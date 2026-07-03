@@ -2,9 +2,9 @@
 
 v1 simplification (deviates from `plan/implementation_plan.md`): SCIP indexing is deferred.
 The broker walks the workspace's Python files, parses each with tree-sitter, and emits
-top-level function/class snippets whose names appear in the issue text. Falls back to
-the first N definitions when no name matches. Cross-file symbol resolution via SCIP
-remains a follow-up.
+top-level function/class snippets whose names appear in the issue text. When no name
+matches it emits nothing, leaving retrieval to the coder backend rather than guessing.
+Cross-file symbol resolution via SCIP remains a follow-up.
 """
 
 from __future__ import annotations
@@ -64,7 +64,6 @@ def make_context_broker_node(
 
         haystack = f"{state.issue.title}\n{state.issue.body}".lower()
         matched: list[_Candidate] = []
-        fallback: list[_Candidate] = []
 
         for py_file in workspace.rglob("*.py"):
             if _EXCLUDED_DIRS.intersection(py_file.parts):
@@ -75,23 +74,23 @@ def make_context_broker_node(
                 continue
             relative = py_file.relative_to(workspace).as_posix()
             for definition in extract_definitions(source):
-                candidate = _Candidate(
-                    chunk=ContextChunk(
-                        file_path=relative,
-                        symbol=definition.name,
-                        snippet=definition.snippet[:_SNIPPET_CAP],
-                    ),
-                    start_line=definition.start_line,
-                    end_line=definition.end_line,
+                if definition.name.lower() not in haystack:
+                    continue
+                matched.append(
+                    _Candidate(
+                        chunk=ContextChunk(
+                            file_path=relative,
+                            symbol=definition.name,
+                            snippet=definition.snippet[:_SNIPPET_CAP],
+                        ),
+                        start_line=definition.start_line,
+                        end_line=definition.end_line,
+                    )
                 )
-                if definition.name.lower() in haystack:
-                    matched.append(candidate)
-                    if len(matched) >= max_chunks:
-                        return _finalize(workspace, matched)
-                elif len(fallback) < max_chunks:
-                    fallback.append(candidate)
+                if len(matched) >= max_chunks:
+                    return _finalize(workspace, matched)
 
-        return _finalize(workspace, matched or fallback[:max_chunks])
+        return _finalize(workspace, matched)
 
     return context_broker_node
 
