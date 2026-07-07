@@ -14,21 +14,27 @@ resolv-pipeline/
 ├── config/
 │   └── settings.toml              # Project configuration (limits, models, timeouts)
 ├── docs/
-│   └── architecture.md            # Deep-dive system design documentation
+│   └── architecture.txt           # Deep-dive system design documentation
+├── plan/
+│   └── implementation_plan.md     # Historical build plan; superseded parts flagged in its update banner
 ├── src/
 │   └── resolv/
 │       ├── __init__.py
-│       ├── main.py                # Main system entrypoint (CLI parser / Event processor)
+│       ├── main.py                # Typer CLI entrypoint (`resolv run --repo owner/name --issue N`)
+│       ├── webhook.py             # FastAPI GitHub webhook listener; launches a per-issue container per event
 │       ├── config.py              # Configuration loading via Pydantic Settings
 │       ├── exceptions.py          # Centralized custom exceptions (e.g., LoopStallError)
 │       │
 │       ├── adapters/              # External interface boundaries
 │       │   ├── __init__.py
 │       │   ├── github_client.py   # PyGithub wrapper for issues and PR lifecycle
-│       │   └── llm_inference.py   # LiteLLM client abstraction for model routing
+│       │   ├── llm_inference.py   # LiteLLM client abstraction for model routing
+│       │   ├── claude_code_client.py  # Claude Agent SDK wrapper + agentic Coder backend
+│       │   └── coder.py           # CoderBackend Protocol and backend selection factory
 │       │
 │       ├── core/                  # Orchestration and State Control
 │       │   ├── __init__.py
+│       │   ├── app.py             # Production wiring: Settings → compiled LangGraph application
 │       │   ├── graph.py           # LangGraph workflow instantiation and edge compilation
 │       │   └── state.py           # Strongly typed Pydantic V2 state definitions (Blackboard)
 │       │
@@ -48,18 +54,19 @@ resolv-pipeline/
 ├── tests/                         # Multi-tier testing suite
 │   ├── __init__.py
 │   ├── conftest.py                # Shared pytest fixtures (mocks for LiteLLM, GitHub API)
-│   ├── unit/                      # Fast, isolated node tests
-│   │   ├── test_context_broker.py
-│   │   ├── test_sandbox.py
-│   │   └── test_state.py
+│   ├── unit/                      # Fast, isolated tests — one test_*.py per source module
+│   │   └── test_*.py              # (test_state, test_sandbox, test_context_broker, ...)
 │   └── integration/               # Multi-node graph loop execution verifications
+│       ├── _stub_nodes.py         # Deterministic stub nodes for graph-cycle tests
 │       ├── test_graph_cycle.py
-│       └── test_sandbox_runtime.py
+│       └── test_webhook.py
 │
 ├── .coderabbit.yaml               # CodeRabbit cloud-review configuration (read from repo root)
 ├── .dockerignore
 ├── .gitignore
+├── LICENSE
 ├── README.md                      # Human-facing project manual
+├── nodes_jobs.md                  # Per-node walkthrough of what each LangGraph node does
 └── pyproject.toml                 # Poetry packaging dependencies and tool configurations
 
 ## Tech Stack
