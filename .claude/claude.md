@@ -12,7 +12,6 @@ resolv-pipeline/
 ├── .container/
 │   └── sandbox.Dockerfile         # Ships the whole resolv app; the per-issue container runs the full pipeline
 ├── config/
-│   ├── .coderabbit.yaml           # CodeRabbit configuration (rules, targets, exclusions)
 │   └── settings.toml              # Project configuration (limits, models, timeouts)
 ├── docs/
 │   └── architecture.md            # Deep-dive system design documentation
@@ -57,6 +56,7 @@ resolv-pipeline/
 │       ├── test_graph_cycle.py
 │       └── test_sandbox_runtime.py
 │
+├── .coderabbit.yaml               # CodeRabbit cloud-review configuration (read from repo root)
 ├── .dockerignore
 ├── .gitignore
 ├── README.md                      # Human-facing project manual
