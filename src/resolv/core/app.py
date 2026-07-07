@@ -19,6 +19,7 @@ def build_production_graph(settings: Settings | None = None) -> CompiledStateGra
     coder_backend = build_coder(
         backend=settings.coder.backend,
         claude_model=settings.coder.claude_model,
+        anthropic_api_key=settings.anthropic_api_key,
         litellm_model=settings.coder.litellm_model,
         litellm_api_key=settings.openai_api_key,
     )

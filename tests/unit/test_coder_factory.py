@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import SecretStr
 
 from resolv.adapters.claude_code_client import ClaudeCodeBackend
 from resolv.adapters.coder import CoderBackend, build_coder, render_user_prompt
@@ -15,6 +16,15 @@ def test_build_coder_returns_claude_code_backend() -> None:
     backend = build_coder("claude_code", claude_model="claude-sonnet-4-6")
     assert isinstance(backend, ClaudeCodeBackend)
     assert isinstance(backend, CoderBackend)
+
+
+def test_build_coder_forwards_anthropic_api_key() -> None:
+    api_key = SecretStr("sk-ant-test")
+    backend = build_coder(
+        "claude_code", claude_model="claude-sonnet-4-6", anthropic_api_key=api_key
+    )
+    assert isinstance(backend, ClaudeCodeBackend)
+    assert backend._anthropic_api_key is api_key
 
 
 def test_build_coder_returns_litellm_backend() -> None:

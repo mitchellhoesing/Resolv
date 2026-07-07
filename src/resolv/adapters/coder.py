@@ -31,6 +31,7 @@ def build_coder(
     backend: str,
     *,
     claude_model: str | None = None,
+    anthropic_api_key: SecretStr | None = None,
     litellm_model: str | None = None,
     litellm_api_key: SecretStr | None = None,
 ) -> CoderBackend:
@@ -39,7 +40,9 @@ def build_coder(
             raise ConfigError("claude_model is required when backend='claude_code'")
         from resolv.adapters.claude_code_client import ClaudeCodeBackend, ClaudeCodeClient
 
-        return ClaudeCodeBackend(ClaudeCodeClient(), model=claude_model)
+        return ClaudeCodeBackend(
+            ClaudeCodeClient(), model=claude_model, anthropic_api_key=anthropic_api_key
+        )
     if backend == "litellm":
         if litellm_model is None:
             raise ConfigError("litellm_model is required when backend='litellm'")

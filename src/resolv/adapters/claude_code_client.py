@@ -13,6 +13,7 @@ import asyncio
 from pathlib import Path
 
 from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
+from pydantic import SecretStr
 
 from resolv.adapters.coder import render_user_prompt
 from resolv.core.state import ContextChunk, IssueRef
@@ -39,6 +40,7 @@ class ClaudeCodeClient:
         model: str,
         allowed_tools: tuple[str, ...] = _DEFAULT_ALLOWED_TOOLS,
         max_turns: int | None = None,
+        env: dict[str, str] | None = None,
     ) -> str:
         options = ClaudeAgentOptions(
             cwd=str(cwd),
@@ -47,6 +49,7 @@ class ClaudeCodeClient:
             allowed_tools=list(allowed_tools),
             permission_mode="acceptEdits",
             max_turns=max_turns,
+            env=env or {},
         )
         final_result = ""
         async for message in query(prompt=prompt, options=options):
@@ -56,9 +59,16 @@ class ClaudeCodeClient:
 
 
 class ClaudeCodeBackend:
-    def __init__(self, client: ClaudeCodeClient, *, model: str) -> None:
+    def __init__(
+        self,
+        client: ClaudeCodeClient,
+        *,
+        model: str,
+        anthropic_api_key: SecretStr | None = None,
+    ) -> None:
         self._client = client
         self._model = model
+        self._anthropic_api_key = anthropic_api_key
 
     def generate_patch(
         self,
@@ -68,6 +78,11 @@ class ClaudeCodeBackend:
         prior_feedback: str | None,
     ) -> None:
         user_prompt = render_user_prompt(issue, pruned_context, prior_feedback)
+        # Scope the key to the SDK subprocess only; an empty key is omitted so
+        # local runs can fall back to the host's logged-in Claude credentials.
+        sdk_env: dict[str, str] = {}
+        if self._anthropic_api_key and self._anthropic_api_key.get_secret_value():
+            sdk_env["ANTHROPIC_API_KEY"] = self._anthropic_api_key.get_secret_value()
         try:
             asyncio.run(
                 self._client.run(
@@ -75,6 +90,7 @@ class ClaudeCodeBackend:
                     system_prompt=_SYSTEM_PROMPT,
                     cwd=workspace_path,
                     model=self._model,
+                    env=sdk_env or None,
                 )
             )
         except Exception as exc:
