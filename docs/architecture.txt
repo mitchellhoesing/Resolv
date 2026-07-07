@@ -2,59 +2,62 @@
                           RESOLV PIPELINE - SYSTEM CONTROL FLOW TOPOLOGY
 ========================================================================================
 
-    [ GitHub Webhook / CLI ]
-               │
-               ▼
-   ┌───────────────────────┐
-   │     src/main.py       │ ───( Initializes State )───► [ Pydantic Blackboard State ]
-   │   Execution Ingress   │                                   ▲     ▲     ▲     ▲
-   └───────────────────────┘                                   │     │     │     │
-               │                                               │     │     │     │
-               ▼                                               │     │     │     │
-   ┌───────────────────────┐                                   │     │     │     │
-   │   src/core/graph.py   │                                   │     │     │     │
-   │   LangGraph Engine    │                                   │     │     │     │
-   └───────────────────────┘                                   │     │     │     │
-               │                                               │     │     │     │
-               ▼                                               │     │     │     │
-  ============= LANGRAPH STATEFUL ITERATION LOOP ==============│=====│=====│=====│======
-               │                                               │     │     │     │
-               ├──► [ Node 1: Context Broker ] ────────────────┘     │     │     │
-               │      │ (Ingestion & SCIP Indexing)                  │     │     │
-               │      ├─► [ scip-python Generator ] ─────────────────┤     │     │
-               │      │     (Emits SCIP Protobuf Index for Global    │     │     │
-               │      │      Cross-Reference and Symbol Resolution)  │     │     │
-               │      └─► [ github_client.py ] ──► GitHub API        │     │     │
-               │                                                     │     │     │
-               ├──► [ Node 2: Lead Coder ] ──────────────────────────┘     │     │
-               │      │ (Generates code mutations/patches)                 │     │
-               │      └─► [ llm_inference.py ] ──► Claude 3.5 Sonnet       │     │
-               │                                                           │     │
-               ├──► [ Node 3: CodeRabbit QA ] ─────────────────────────────┘     │
-               │      │ (Validates semantic code changes)                        │
-               │      │                                                          │
-               │      │   ┌─────────────── DOCKER SANDBOX ───────────────┐       │
-               │      └───│─ Mounts local workspace volume               │       │
-               │          │─ Runs subprocess: `coderabbit review`        │       │
-               │          └──────────────────────────────────────────────┘       │
-               │                                                                 │
-               └──► [ Node 4: Test Runner ] ─────────────────────────────────────┘
-                      │ (Executes pytest / native workspace tests)
-                      └─► Runs inside sandboxed container (`docker-py`)
-                                                                
-  ============= CONDITIONAL EDGE ROUTING & EGRESS ======================================
-               │
-               ▼
-     [ Evaluation Gates ]
-               │
-               ├──► [ qa_status == REJECTED ] or [ test_status == FAILED ]
-               │      │
-               │      └─► [ Increment Iteration Count ] ──► (Loop back to Lead Coder)
-               │            * Safety Guardrail: Abort and log if iterations > 5
-               │
-               └──► [ qa_status == APPROVED ] and [ test_status == PASSED ]
-                      │
-                      ▼
-            [ Node 5: Deliver Engine ]
-              │ (Finalizes patch, commits via GitPython)
-              └─► Opens upstream Pull Request via PyGithub
+  The entire pipeline runs INSIDE one disposable per-issue Docker container. The host
+  only launches it:
+
+      docker run --rm --cap-add=SYS_ADMIN \
+        -e RESOLV_GITHUB_TOKEN -e RESOLV_ANTHROPIC_API_KEY -e RESOLV_OPENAI_API_KEY \
+        resolv-sandbox:latest run --repo owner/name --issue 123
+
+  CLI users run that directly; the webhook server runs it per queued issue.
+  CodeRabbit is NOT a pipeline node — it reviews the pushed PR in the cloud afterwards.
+
+  ┌──────────────────────────────────────────────────────────────────────────────────┐
+  │                        DISPOSABLE PER-ISSUE CONTAINER                              │
+  │                                                                                    │
+  │   [ CLI `resolv run` / Webhook-dispatched ]                                        │
+  │              │                                                                     │
+  │              ▼                                                                     │
+  │   ┌───────────────────────┐                                                        │
+  │   │     src/main.py       │ ──( Initializes State )──► [ Pydantic Blackboard ]     │
+  │   │   Execution Ingress   │                                ▲     ▲     ▲           │
+  │   └───────────────────────┘                                │     │     │           │
+  │              │                                             │     │     │           │
+  │              ▼                                             │     │     │           │
+  │   ┌───────────────────────┐                                │     │     │           │
+  │   │   src/core/graph.py   │                                │     │     │           │
+  │   │   LangGraph Engine    │                                │     │     │           │
+  │   └───────────────────────┘                                │     │     │           │
+  │              │                                             │     │     │           │
+  │  ===== LANGGRAPH STATEFUL ITERATION LOOP ==================│=====│=====│=========  │
+  │              │                                             │     │     │           │
+  │              ├──► [ Node 1: Context Broker ] ──────────────┘     │     │           │
+  │              │      │ (runs once at ingress, not in the loop)    │     │           │
+  │              │      ├─► clone target repo (GitPython)            │     │           │
+  │              │      ├─► tree-sitter: extract relevant snippets   │     │           │
+  │              │      └─► git blame: provenance of those lines     │     │           │
+  │              │                                                   │     │           │
+  │              ├──► [ Node 2: Coder ] ──────────────────────────────┘     │           │
+  │              │      │ (mutates the workspace in place)                  │           │
+  │              │      └─► Claude Agent SDK  *or*  LiteLLM (selectable)     │           │
+  │              │                                                          │           │
+  │              └──► [ Node 3: Test Runner ] ───────────────────────────────┘           │
+  │                     │ detect pytest / tox / unittest, then run it as an             │
+  │                     │ UNTRUSTED child: `unshare --net` (dead network) +             │
+  │                     │ explicitly scrubbed env (no secrets). CAP_SYS_ADMIN required. │
+  │                                                                                    │
+  │  ===== CONDITIONAL EDGE ROUTING ================================================== │
+  │              │                                                                     │
+  │              ▼                                                                     │
+  │     [ Gate: test_status ]                                                          │
+  │              ├──► FAILED  ─► increment iteration ─► loop back to Coder (w/ feedback)│
+  │              │               * abort + LoopStallError if iterations >= max (5)     │
+  │              │                                                                     │
+  │              └──► PASSED  ─► [ Node 4: Deliver ]                                    │
+  │                                │ branch + commit (GitPython)                       │
+  │                                └─► push + open PR (PyGithub) ──► GitHub            │
+  │                                                                                    │
+  └──────────────────────────────────────────────────────────────────────────────────┘
+                                       │
+                                       ▼
+                          [ CodeRabbit reviews the PR in the cloud ]

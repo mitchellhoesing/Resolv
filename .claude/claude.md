@@ -10,7 +10,7 @@ resolv-pipeline/
 │       ├── ci.yml                 # Runs test suite, linters, and type checking
 │       └── cd.yml                 # Automates image publishing or deployment
 ├── .container/
-│   └── sandbox.Dockerfile         # Secure, isolated container environment for code execution
+│   └── sandbox.Dockerfile         # Ships the whole resolv app; the per-issue container runs the full pipeline
 ├── config/
 │   ├── .coderabbit.yaml           # CodeRabbit configuration (rules, targets, exclusions)
 │   └── settings.toml              # Project configuration (limits, models, timeouts)
@@ -35,23 +35,23 @@ resolv-pipeline/
 │       │
 │       ├── nodes/                 # LangGraph Worker Nodes
 │       │   ├── __init__.py
-│       │   ├── context_broker.py  # Ingestion, AST parsing via tree-sitter, and pruning
+│       │   ├── context_broker.py  # Ingestion, AST parsing via tree-sitter, git-blame provenance, pruning
 │       │   ├── coder.py           # LLM patch generation logic
-│       │   ├── coderabbit_qa.py   # Subprocess controller invoking CodeRabbit CLI
-│       │   ├── test_runner.py     # Docker-py runner executing native workspace tests
+│       │   ├── test_runner.py     # Runs the target tests as a network-isolated, secret-scrubbed subprocess
 │       │   └── deliver.py         # GitPython branching, committing, and upstream delivery
 │       │
 │       └── utils/                 # Shared helper modules
 │           ├── __init__.py
 │           ├── ast_tools.py       # Low-level Tree-sitter tree traversal utilities
-│           └── docker_client.py   # Core Docker-py API initialization and safety wrappers
+│           ├── git_provenance.py  # git-blame provenance for the lines in each context snippet
+│           └── sandbox.py         # Spawns the test command under `unshare --net` with a scrubbed env
 │
 ├── tests/                         # Multi-tier testing suite
 │   ├── __init__.py
 │   ├── conftest.py                # Shared pytest fixtures (mocks for LiteLLM, GitHub API)
 │   ├── unit/                      # Fast, isolated node tests
 │   │   ├── test_context_broker.py
-│   │   ├── test_coderabbit_qa.py
+│   │   ├── test_sandbox.py
 │   │   └── test_state.py
 │   └── integration/               # Multi-node graph loop execution verifications
 │       ├── test_graph_cycle.py
@@ -68,8 +68,9 @@ Language: Python
 Orchestration & State Machine: langgraph, langchain-core, pydantic
 Inference Layer: litellm
 LLMs: Claude, OpenAI
-Code Analysis & QA Engine: SCIP, tree-sitter, coderabbit
-Sandbox: Docker
+Code Analysis: tree-sitter (git-blame provenance for context)
+Execution model: the whole pipeline runs inside one disposable per-issue Docker container; the untrusted test suite is isolated in-process via a Linux network namespace (`unshare --net`) with a scrubbed environment. Requires `--cap-add=SYS_ADMIN`.
+QA: CodeRabbit runs in the cloud on the pushed PR — it is not invoked in-pipeline.
 Git operations: GitPython, PyGithub
 
 ## Standards
