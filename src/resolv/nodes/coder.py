@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -14,6 +15,10 @@ def make_coder_node(
     backend: CoderBackend,
 ) -> Callable[[BlackboardState], dict[str, Any]]:
     def coder_node(state: BlackboardState) -> dict[str, Any]:
+        _timestamp = datetime.now(timezone.utc).strftime("%m/%d/%YT%H:%MZ")
+        print(f'"timestamp": {_timestamp}')
+        print('"node": Coder')
+        print('"event": "Node Activated"')
         if state.iteration > 0:
             _reset_workspace(state.workspace_path)
 

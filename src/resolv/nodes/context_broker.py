@@ -10,6 +10,7 @@ Cross-file symbol resolution via SCIP remains a follow-up.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -58,6 +59,10 @@ def make_context_broker_node(
     github_token: SecretStr | None = None,
 ) -> Callable[[BlackboardState], dict[str, Any]]:
     def context_broker_node(state: BlackboardState) -> dict[str, Any]:
+        _timestamp = datetime.now(timezone.utc).strftime("%m/%d/%YT%H:%MZ")
+        print(f'"timestamp": {_timestamp}')
+        print('"node": Context Broker')
+        print('"event": "Node Activated"')
         workspace = state.workspace_path
         if not (workspace / ".git").exists():
             _clone(state.issue.owner, state.issue.repo, workspace, github_token)

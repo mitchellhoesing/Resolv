@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any, Callable
 
 from git import GitCommandError, Repo
@@ -18,6 +19,10 @@ def make_deliver_node(
     branch_prefix: str = "resolv/issue-",
 ) -> Callable[[BlackboardState], dict[str, Any]]:
     def deliver_node(state: BlackboardState) -> dict[str, Any]:
+        _timestamp = datetime.now(timezone.utc).strftime("%m/%d/%YT%H:%MZ")
+        print(f'"timestamp": {_timestamp}')
+        print('"node": Deliver')
+        print('"event": "Node Activated"')
         branch_name = f"{branch_prefix}{state.issue.number}"
         commit_message = f"fix: resolve issue #{state.issue.number} — {state.issue.title}"
         try:

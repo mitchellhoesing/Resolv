@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -44,6 +45,10 @@ def make_test_runner_node(
     sandbox_runner: Callable[..., Any] = run_isolated,
 ) -> Callable[[BlackboardState], dict[str, Any]]:
     def test_runner_node(state: BlackboardState) -> dict[str, Any]:
+        _timestamp = datetime.now(timezone.utc).strftime("%m/%d/%YT%H:%MZ")
+        print(f'"timestamp": {_timestamp}')
+        print('"node": Test Runner')
+        print('"event": "Node Activated"')
         command = detect_test_command(state.workspace_path)
         if command is None:
             return _record_and_return(state, "FAILED", "no test runner detected")
