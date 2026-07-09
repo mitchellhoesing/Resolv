@@ -2,7 +2,7 @@
 claude_model = "claude-opus-4-7"
 
 [loop]
-max_iterations = 5
+max_iterations = 3
 
 [delivery]
 base_branch = "main"

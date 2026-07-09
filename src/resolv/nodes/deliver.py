@@ -9,6 +9,7 @@ from git import GitCommandError, Repo
 from resolv.adapters.github_client import GitHubClient
 from resolv.core.state import BlackboardState
 from resolv.exceptions import DeliveryError
+from resolv.utils.run_log import log_event
 
 
 def make_deliver_node(
@@ -28,17 +29,29 @@ def make_deliver_node(
             repo.index.commit(commit_message)
             repo.remote("origin").push(branch_name)
         except GitCommandError as exc:
+            log_event(
+                f"[deliver] error: git operation failed for {branch_name}: {exc.stderr or exc}"
+            )
             raise DeliveryError(
                 f"git operation failed for {branch_name}: {exc.stderr or exc}"
             ) from exc
 
-        pr_url = github_client.open_pull_request(
-            state.issue.owner,
-            state.issue.repo,
-            head_branch=branch_name,
-            base_branch=base_branch,
-            title=commit_message,
-            body=f"Resolves #{state.issue.number}\n\n{state.issue.body or state.issue.title}",
+        try:
+            pr_url = github_client.open_pull_request(
+                state.issue.owner,
+                state.issue.repo,
+                head_branch=branch_name,
+                base_branch=base_branch,
+                title=commit_message,
+                body=f"Resolves #{state.issue.number}\n\n{state.issue.body or state.issue.title}",
+            )
+        except Exception as exc:
+            log_event(f"[deliver] error: {exc}")
+            raise
+        log_event(
+            f"[deliver] repo={state.issue.owner}/{state.issue.repo} "
+            f'branch={branch_name} commit="{commit_message}" '
+            f"issue=#{state.issue.number} pr={pr_url}"
         )
         return {"test_output": f"PR opened: {pr_url}"}
 

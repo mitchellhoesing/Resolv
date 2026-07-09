@@ -27,7 +27,7 @@ class CoderSettings(BaseModel):
 
 
 class LoopSettings(BaseModel):
-    max_iterations: int = Field(default=5, ge=1, le=20)
+    max_iterations: int = Field(default=3, ge=1, le=20)
 
 
 class DeliverySettings(BaseModel):

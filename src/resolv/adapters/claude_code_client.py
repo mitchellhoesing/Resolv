@@ -15,9 +15,10 @@ from pathlib import Path
 from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
 from pydantic import SecretStr
 
-from resolv.adapters.coder import dump_prompt_log, render_user_prompt
+from resolv.adapters.coder import render_user_prompt
 from resolv.core.state import IssueRef
 from resolv.exceptions import CoderError
+from resolv.utils.run_log import log_event
 
 _DEFAULT_ALLOWED_TOOLS = ("Read", "Write", "Edit", "Grep", "Glob")
 
@@ -77,7 +78,7 @@ class ClaudeCodeBackend:
         prior_feedback: str | None,
     ) -> None:
         user_prompt = render_user_prompt(issue, prior_feedback)
-        dump_prompt_log(user_prompt)
+        log_event(user_prompt)
         # Scope the key to the SDK subprocess only; an empty key is omitted so
         # local runs can fall back to the host's logged-in Claude credentials.
         sdk_env: dict[str, str] = {}

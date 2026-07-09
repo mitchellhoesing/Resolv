@@ -12,6 +12,18 @@ from resolv.core.state import BlackboardState, IssueRef, IterationRecord
 from resolv.nodes.coder import make_coder_node
 
 
+@pytest.fixture(autouse=True)
+def _isolate_log_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+
+def _read_run_log(tmp_path: Path) -> str:
+    return "\n".join(
+        log_file.read_text(encoding="utf-8")
+        for log_file in (tmp_path / "logs").glob("*.log")
+    )
+
+
 def _state(workspace: Path, *, iteration: int = 0, **overrides: object) -> BlackboardState:
     issue = IssueRef(owner="a", repo="b", number=1, title="t", body="body", labels=())
     base: dict[str, object] = {
@@ -101,3 +113,19 @@ def test_iteration_without_feedback_passes_none(repo: Path) -> None:
     node = make_coder_node(backend)
     node(_state(repo, iteration=1, test_status="PASSED", test_output=None))
     assert captured["prior_feedback"] is None
+
+
+def test_logs_iteration_start(repo: Path) -> None:
+    backend = MagicMock()
+    node = make_coder_node(backend)
+    node(_state(repo))
+    assert "[coder] iteration 1 started" in _read_run_log(repo)
+
+
+def test_backend_error_is_logged_and_reraised(repo: Path) -> None:
+    backend = MagicMock()
+    backend.generate_patch.side_effect = RuntimeError("backend exploded")
+    node = make_coder_node(backend)
+    with pytest.raises(RuntimeError, match="backend exploded"):
+        node(_state(repo))
+    assert "[coder] error: backend exploded" in _read_run_log(repo)

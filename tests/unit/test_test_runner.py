@@ -8,8 +8,24 @@ from unittest.mock import MagicMock
 import pytest
 
 from resolv.core.state import BlackboardState, IssueRef
-from resolv.nodes.test_runner import detect_test_command, make_test_runner_node
+from resolv.nodes.test_runner import (
+    _parse_test_counts,
+    detect_test_command,
+    make_test_runner_node,
+)
 from resolv.utils.sandbox import SandboxResult
+
+
+@pytest.fixture(autouse=True)
+def _isolate_log_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+
+def _read_run_log(tmp_path: Path) -> str:
+    return "\n".join(
+        log_file.read_text(encoding="utf-8")
+        for log_file in (tmp_path / "logs").glob("*.log")
+    )
 
 
 @pytest.fixture
@@ -78,3 +94,57 @@ def test_node_marks_failed_on_nonzero_exit(state: BlackboardState) -> None:
     assert result["test_status"] == "FAILED"
     assert "2 failed" in result["test_output"]
     assert "trace" in result["test_output"]
+
+
+def test_logs_per_test_counts_on_pass(state: BlackboardState, tmp_path: Path) -> None:
+    (state.workspace_path / "conftest.py").write_text("")
+    runner = MagicMock(
+        return_value=SandboxResult(exit_code=0, stdout="3 passed", stderr="")
+    )
+    node = make_test_runner_node(timeout=60, sandbox_runner=runner)
+    node(state)
+    assert "[test_runner] 3 passed, 0 failed — status PASSED" in _read_run_log(tmp_path)
+
+
+def test_logs_per_test_counts_on_fail(state: BlackboardState, tmp_path: Path) -> None:
+    (state.workspace_path / "conftest.py").write_text("")
+    runner = MagicMock(
+        return_value=SandboxResult(exit_code=1, stdout="1 passed, 2 failed", stderr="")
+    )
+    node = make_test_runner_node(timeout=60, sandbox_runner=runner)
+    node(state)
+    assert "[test_runner] 1 passed, 2 failed — status FAILED" in _read_run_log(tmp_path)
+
+
+def test_logs_status_only_when_counts_unparseable(
+    state: BlackboardState, tmp_path: Path
+) -> None:
+    (state.workspace_path / "conftest.py").write_text("")
+    runner = MagicMock(
+        return_value=SandboxResult(exit_code=1, stdout="segfault", stderr="")
+    )
+    node = make_test_runner_node(timeout=60, sandbox_runner=runner)
+    node(state)
+    assert "[test_runner] status FAILED" in _read_run_log(tmp_path)
+
+
+def test_logs_error_when_no_framework(state: BlackboardState, tmp_path: Path) -> None:
+    node = make_test_runner_node(timeout=1, sandbox_runner=MagicMock())
+    node(state)
+    assert "[test_runner] error: no test runner detected" in _read_run_log(tmp_path)
+
+
+def test_sandbox_error_is_logged_and_reraised(
+    state: BlackboardState, tmp_path: Path
+) -> None:
+    (state.workspace_path / "conftest.py").write_text("")
+    runner = MagicMock(side_effect=RuntimeError("namespace unavailable"))
+    node = make_test_runner_node(timeout=60, sandbox_runner=runner)
+    with pytest.raises(RuntimeError, match="namespace unavailable"):
+        node(state)
+    assert "[test_runner] error: namespace unavailable" in _read_run_log(tmp_path)
+
+
+def test_parse_counts_from_unittest_summary() -> None:
+    output = "Ran 5 tests in 0.100s\n\nFAILED (failures=1, errors=1)"
+    assert _parse_test_counts(output) == (3, 2)
