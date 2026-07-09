@@ -20,14 +20,6 @@ class IssueRef(BaseModel):
     labels: tuple[str, ...] = ()
 
 
-class ContextChunk(BaseModel):
-    model_config = ConfigDict(frozen=True)
-    file_path: str
-    symbol: str
-    snippet: str
-    provenance: tuple[str, ...] = ()  # git-blame lines: commits that last touched this snippet
-
-
 class IterationRecord(BaseModel):
     model_config = ConfigDict(frozen=True)
     iteration: int
@@ -41,8 +33,6 @@ class BlackboardState(BaseModel):
 
     issue: IssueRef
     workspace_path: Path
-    scip_index_path: Path | None = None
-    pruned_context: list[ContextChunk] = Field(default_factory=list)
     current_diff: str | None = None
     test_status: TestStatus = "PENDING"
     test_output: str | None = None

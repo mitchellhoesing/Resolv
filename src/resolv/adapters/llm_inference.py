@@ -16,7 +16,7 @@ from pydantic import SecretStr
 from unidiff import PatchSet
 from unidiff.errors import UnidiffParseError
 
-from resolv.adapters.coder import render_user_prompt
+from resolv.adapters.coder import dump_prompt_log, render_user_prompt
 from resolv.core.state import ContextChunk, IssueRef
 from resolv.exceptions import CoderError
 
@@ -62,6 +62,7 @@ class LiteLLMBackend:
         prior_feedback: str | None,
     ) -> None:
         user_prompt = render_user_prompt(issue, pruned_context, prior_feedback)
+        dump_prompt_log(user_prompt)
         last_error: Exception | None = None
         for attempt in range(self._max_attempts):
             diff_text = self._client.complete(_SYSTEM_PROMPT, user_prompt)

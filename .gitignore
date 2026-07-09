@@ -26,6 +26,7 @@ htmlcov/
 
 # Resolv runtime state
 workspaces/
+logs/
 
 # Local notes
 TODO.md
