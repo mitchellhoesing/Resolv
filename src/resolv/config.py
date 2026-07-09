@@ -9,7 +9,6 @@ Secrets are env-only; they never appear in the TOML file.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
 
 from pydantic import BaseModel, Field, SecretStr
 from pydantic_settings import (
@@ -24,17 +23,11 @@ _DEFAULT_TOML = _PROJECT_ROOT / "config" / "settings.toml"
 
 
 class CoderSettings(BaseModel):
-    backend: Literal["claude_code", "litellm"] = "claude_code"
     claude_model: str = "claude-opus-4-7"
-    litellm_model: str = "gpt-4o"
 
 
 class LoopSettings(BaseModel):
     max_iterations: int = Field(default=5, ge=1, le=20)
-
-
-class ContextSettings(BaseModel):
-    max_chunks: int = Field(default=20, ge=1, le=200)
 
 
 class DeliverySettings(BaseModel):
@@ -56,14 +49,12 @@ class WebhookSettings(BaseModel):
 class Settings(BaseSettings):
     coder: CoderSettings = CoderSettings()
     loop: LoopSettings = LoopSettings()
-    context: ContextSettings = ContextSettings()
     delivery: DeliverySettings = DeliverySettings()
     sandbox: SandboxSettings = SandboxSettings()
     webhook: WebhookSettings = WebhookSettings()
 
     github_token: SecretStr = SecretStr("")
     anthropic_api_key: SecretStr = SecretStr("")
-    openai_api_key: SecretStr = SecretStr("")
     github_webhook_secret: SecretStr = SecretStr("")
 
     model_config = SettingsConfigDict(

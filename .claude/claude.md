@@ -28,9 +28,8 @@ resolv-pipeline/
 │       ├── adapters/              # External interface boundaries
 │       │   ├── __init__.py
 │       │   ├── github_client.py   # PyGithub wrapper for issues and PR lifecycle
-│       │   ├── llm_inference.py   # LiteLLM client abstraction for model routing
 │       │   ├── claude_code_client.py  # Claude Agent SDK wrapper + agentic Coder backend
-│       │   └── coder.py           # CoderBackend Protocol and backend selection factory
+│       │   └── coder.py           # CoderBackend Protocol and shared prompt rendering/logging
 │       │
 │       ├── core/                  # Orchestration and State Control
 │       │   ├── __init__.py
@@ -40,20 +39,18 @@ resolv-pipeline/
 │       │
 │       ├── nodes/                 # LangGraph Worker Nodes
 │       │   ├── __init__.py
-│       │   ├── context_broker.py  # Ingestion, AST parsing via tree-sitter, git-blame provenance, pruning
+│       │   ├── context_broker.py  # Ingestion: clones the target repo into the workspace
 │       │   ├── coder.py           # LLM patch generation logic
 │       │   ├── test_runner.py     # Runs the target tests as a network-isolated, secret-scrubbed subprocess
 │       │   └── deliver.py         # GitPython branching, committing, and upstream delivery
 │       │
 │       └── utils/                 # Shared helper modules
 │           ├── __init__.py
-│           ├── ast_tools.py       # Low-level Tree-sitter tree traversal utilities
-│           ├── git_provenance.py  # git-blame provenance for the lines in each context snippet
 │           └── sandbox.py         # Spawns the test command under `unshare --net` with a scrubbed env
 │
 ├── tests/                         # Multi-tier testing suite
 │   ├── __init__.py
-│   ├── conftest.py                # Shared pytest fixtures (mocks for LiteLLM, GitHub API)
+│   ├── conftest.py                # Shared pytest fixtures (sample issue/state)
 │   ├── unit/                      # Fast, isolated tests — one test_*.py per source module
 │   │   └── test_*.py              # (test_state, test_sandbox, test_context_broker, ...)
 │   └── integration/               # Multi-node graph loop execution verifications
@@ -73,9 +70,8 @@ resolv-pipeline/
 Virtual Environment: venv
 Language: Python
 Orchestration & State Machine: langgraph, langchain-core, pydantic
-Inference Layer: litellm
-LLMs: Claude, OpenAI
-Code Analysis: tree-sitter (git-blame provenance for context)
+Inference Layer: Claude Agent SDK (agentic Coder backend)
+LLMs: Claude
 Execution model: the whole pipeline runs inside one disposable per-issue Docker container; the untrusted test suite is isolated in-process via a Linux network namespace (`unshare --net`) with a scrubbed environment. Requires `--cap-add=SYS_ADMIN`.
 QA: CodeRabbit runs in the cloud on the pushed PR — it is not invoked in-pipeline.
 Git operations: GitPython, PyGithub

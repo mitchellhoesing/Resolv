@@ -21,7 +21,6 @@ def make_coder_node(
         backend.generate_patch(
             issue=state.issue,
             workspace_path=state.workspace_path,
-            pruned_context=state.pruned_context,
             prior_feedback=prior_feedback,
         )
         diff = _capture_diff(state.workspace_path)

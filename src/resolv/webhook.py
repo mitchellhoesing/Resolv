@@ -71,7 +71,6 @@ def _default_runner(settings: Settings) -> Runner:
             "docker", "run", "--rm", "--cap-add=SYS_ADMIN",
             "-e", "RESOLV_GITHUB_TOKEN",
             "-e", "RESOLV_ANTHROPIC_API_KEY",
-            "-e", "RESOLV_OPENAI_API_KEY",
             image_tag,
             "run", "--repo", f"{owner}/{repo}", "--issue", str(number),
         ]
@@ -79,7 +78,6 @@ def _default_runner(settings: Settings) -> Runner:
             **os.environ,
             "RESOLV_GITHUB_TOKEN": settings.github_token.get_secret_value(),
             "RESOLV_ANTHROPIC_API_KEY": settings.anthropic_api_key.get_secret_value(),
-            "RESOLV_OPENAI_API_KEY": settings.openai_api_key.get_secret_value(),
         }
         await asyncio.to_thread(subprocess.run, command, env=env, check=False)
 

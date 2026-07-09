@@ -74,10 +74,9 @@ class ClaudeCodeBackend:
         self,
         issue: IssueRef,
         workspace_path: Path,
-        pruned_context: list[ContextChunk],
         prior_feedback: str | None,
     ) -> None:
-        user_prompt = render_user_prompt(issue, pruned_context, prior_feedback)
+        user_prompt = render_user_prompt(issue, prior_feedback)
         dump_prompt_log(user_prompt)
         # Scope the key to the SDK subprocess only; an empty key is omitted so
         # local runs can fall back to the host's logged-in Claude credentials.

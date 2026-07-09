@@ -6,7 +6,7 @@
   only launches it:
 
       docker run --rm --cap-add=SYS_ADMIN \
-        -e RESOLV_GITHUB_TOKEN -e RESOLV_ANTHROPIC_API_KEY -e RESOLV_OPENAI_API_KEY \
+        -e RESOLV_GITHUB_TOKEN -e RESOLV_ANTHROPIC_API_KEY \
         resolv-sandbox:latest run --repo owner/name --issue 123
 
   CLI users run that directly; the webhook server runs it per queued issue.
@@ -33,13 +33,11 @@
   │              │                                             │     │     │           │
   │              ├──► [ Node 1: Context Broker ] ──────────────┘     │     │           │
   │              │      │ (runs once at ingress, not in the loop)    │     │           │
-  │              │      ├─► clone target repo (GitPython)            │     │           │
-  │              │      ├─► tree-sitter: extract relevant snippets   │     │           │
-  │              │      └─► git blame: provenance of those lines     │     │           │
+  │              │      └─► clone target repo (GitPython)            │     │           │
   │              │                                                   │     │           │
   │              ├──► [ Node 2: Coder ] ──────────────────────────────┘     │           │
   │              │      │ (mutates the workspace in place)                  │           │
-  │              │      └─► Claude Agent SDK  *or*  LiteLLM (selectable)     │           │
+  │              │      └─► Claude Agent SDK (agentic explore + edit)        │           │
   │              │                                                          │           │
   │              └──► [ Node 3: Test Runner ] ───────────────────────────────┘           │
   │                     │ detect pytest / tox / unittest, then run it as an             │

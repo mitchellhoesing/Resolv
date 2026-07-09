@@ -93,7 +93,7 @@ def test_backend_invokes_client_with_workspace(
     fake_client.run = fake_run
 
     ClaudeCodeBackend(fake_client, model="claude-opus-4-7").generate_patch(
-        issue, tmp_path, [], None
+        issue, tmp_path, None
     )
 
     assert fake_run.kwargs["cwd"] == tmp_path
@@ -117,7 +117,7 @@ def test_backend_scopes_api_key_to_sdk_env(
     backend = ClaudeCodeBackend(
         fake_client, model="claude-opus-4-7", anthropic_api_key=SecretStr("sk-ant-test")
     )
-    backend.generate_patch(issue, tmp_path, [], None)
+    backend.generate_patch(issue, tmp_path, None)
 
     assert fake_run.kwargs["env"] == {"ANTHROPIC_API_KEY": "sk-ant-test"}
 
@@ -137,7 +137,7 @@ def test_backend_omits_env_for_empty_api_key(
     backend = ClaudeCodeBackend(
         fake_client, model="claude-opus-4-7", anthropic_api_key=SecretStr("")
     )
-    backend.generate_patch(issue, tmp_path, [], None)
+    backend.generate_patch(issue, tmp_path, None)
 
     assert fake_run.kwargs["env"] is None
 
@@ -154,5 +154,5 @@ def test_backend_wraps_sdk_errors_in_coder_error(
 
     with pytest.raises(CoderError, match="sdk crash"):
         ClaudeCodeBackend(fake_client, model="claude-opus-4-7").generate_patch(
-            issue, tmp_path, [], None
+            issue, tmp_path, None
         )

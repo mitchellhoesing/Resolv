@@ -9,7 +9,6 @@ from pydantic import ValidationError
 
 from resolv.core.state import (
     BlackboardState,
-    ContextChunk,
     IssueRef,
     IterationRecord,
 )
@@ -18,10 +17,8 @@ from resolv.core.state import (
 def test_blackboard_defaults(sample_state: BlackboardState) -> None:
     assert sample_state.test_status == "PENDING"
     assert sample_state.iteration == 0
-    assert sample_state.pruned_context == []
     assert sample_state.history == []
     assert sample_state.current_diff is None
-    assert sample_state.scip_index_path is None
 
 
 def test_blackboard_round_trip_json(sample_state: BlackboardState) -> None:
@@ -33,12 +30,6 @@ def test_blackboard_round_trip_json(sample_state: BlackboardState) -> None:
 def test_issue_ref_is_frozen(sample_state: BlackboardState) -> None:
     with pytest.raises(ValidationError):
         sample_state.issue.number = 999  # type: ignore[misc]
-
-
-def test_context_chunk_is_frozen() -> None:
-    chunk = ContextChunk(file_path="src/x.py", symbol="foo", snippet="def foo(): ...")
-    with pytest.raises(ValidationError):
-        chunk.symbol = "bar"  # type: ignore[misc]
 
 
 def test_record_iteration_appends_history(sample_state: BlackboardState) -> None:
