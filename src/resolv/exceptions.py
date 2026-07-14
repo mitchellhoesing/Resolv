@@ -13,6 +13,10 @@ class SandboxError(ResolvError):
     """Raised when isolated test execution cannot be launched."""
 
 
+class InstallError(ResolvError):
+    """Raised when installing the target repo's dependencies fails."""
+
+
 class DeliveryError(ResolvError):
     """Raised when branch creation, commit, or PR opening fails."""
 
