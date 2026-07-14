@@ -21,6 +21,7 @@ def make_deliver_node(
     def deliver_node(state: BlackboardState) -> dict[str, Any]:
         branch_name = f"{branch_prefix}{state.issue.number}"
         commit_message = f"fix: resolve issue #{state.issue.number} — {state.issue.title}"
+        log_event(f"[deliver] pushing branch {branch_name} for issue #{state.issue.number}")
         try:
             repo = Repo(str(state.workspace_path))
             branch = repo.create_head(branch_name)

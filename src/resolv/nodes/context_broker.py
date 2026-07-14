@@ -16,6 +16,7 @@ from pydantic import SecretStr
 
 from resolv.core.state import BlackboardState
 from resolv.exceptions import IngestionError
+from resolv.utils.run_log import log_event
 
 
 def make_context_broker_node(
@@ -25,7 +26,12 @@ def make_context_broker_node(
     def context_broker_node(state: BlackboardState) -> dict[str, Any]:
         workspace = state.workspace_path
         if not (workspace / ".git").exists():
+            log_event(
+                f"[context_broker] cloning {state.issue.owner}/{state.issue.repo}"
+            )
             _clone(state.issue.owner, state.issue.repo, workspace, github_token)
+        else:
+            log_event("[context_broker] workspace already present")
         return {}
 
     return context_broker_node
