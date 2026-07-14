@@ -40,13 +40,14 @@ resolv-pipeline/
 │       ├── nodes/                 # LangGraph Worker Nodes
 │       │   ├── __init__.py
 │       │   ├── context_broker.py  # Ingestion: clones the target repo into the workspace
+│       │   ├── env_installer.py   # Installs target repo dev/test deps into a per-repo venv
 │       │   ├── coder.py           # LLM patch generation logic
 │       │   ├── test_runner.py     # Runs the target tests as a network-isolated, secret-scrubbed subprocess
 │       │   └── deliver.py         # GitPython branching, committing, and upstream delivery
 │       │
 │       └── utils/                 # Shared helper modules
 │           ├── __init__.py
-│           └── sandbox.py         # Spawns the test command under `unshare --net` with a scrubbed env
+│           └── sandbox.py         # Scrubbed-env subprocess spawning: `unshare --net` for tests, networked for installs
 │
 ├── tests/                         # Multi-tier testing suite
 │   ├── __init__.py
