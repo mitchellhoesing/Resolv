@@ -35,14 +35,21 @@
   │              │      │ (runs once at ingress, not in the loop)    │     │           │
   │              │      └─► clone target repo (GitPython)            │     │           │
   │              │                                                   │     │           │
-  │              ├──► [ Node 2: Coder ] ──────────────────────────────┘     │           │
+  │              ├──► [ Node 2: Env Installer ]                      │     │           │
+  │              │      │ (runs once, not in the loop; network ON,   │     │           │
+  │              │      │  env scrubbed — untrusted build hooks)     │     │           │
+  │              │      └─► install repo deps into a SIBLING venv    │     │           │
+  │              │          (pip / poetry / uv / pipenv)             │     │           │
+  │              │                                                   │     │           │
+  │              ├──► [ Node 3: Coder ] ──────────────────────────────┘     │           │
   │              │      │ (mutates the workspace in place)                  │           │
   │              │      └─► Claude Agent SDK (agentic explore + edit)        │           │
   │              │                                                          │           │
-  │              └──► [ Node 3: Test Runner ] ───────────────────────────────┘           │
+  │              └──► [ Node 4: Test Runner ] ───────────────────────────────┘           │
   │                     │ detect pytest / tox / unittest, then run it as an             │
   │                     │ UNTRUSTED child: `unshare --net` (dead network) +             │
-  │                     │ explicitly scrubbed env (no secrets). CAP_SYS_ADMIN required. │
+  │                     │ explicitly scrubbed env (no secrets) + venv-first            │
+  │                     │ PATH when the installer made one. CAP_SYS_ADMIN required.    │
   │                                                                                    │
   │  ===== CONDITIONAL EDGE ROUTING ================================================== │
   │              │                                                                     │
@@ -51,7 +58,7 @@
   │              ├──► FAILED  ─► increment iteration ─► loop back to Coder (w/ feedback)│
   │              │               * abort + LoopStallError if iterations >= max (5)     │
   │              │                                                                     │
-  │              └──► PASSED  ─► [ Node 4: Deliver ]                                    │
+  │              └──► PASSED  ─► [ Node 5: Deliver ]                                    │
   │                                │ branch + commit (GitPython)                       │
   │                                └─► push + open PR (PyGithub) ──► GitHub            │
   │                                                                                    │

@@ -33,6 +33,15 @@ COPY config/ ./config/
 # plus tox for target repos that invoke it.
 RUN pip install --no-cache-dir -e ".[dev]" tox
 
+# Package managers the env_installer node needs to install target-repo deps
+# (requires outbound network at run time — the container default). `uv tool
+# install` keeps poetry/pipenv in isolated envs so their dependency trees
+# can't conflict with resolv's own.
+RUN pip install --no-cache-dir uv \
+    && uv tool install poetry \
+    && uv tool install pipenv
+ENV PATH="/root/.local/bin:$PATH"
+
 WORKDIR /workspace
 
 ENTRYPOINT ["resolv"]

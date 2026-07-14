@@ -16,6 +16,7 @@ from resolv.adapters.github_client import GitHubClient
 from resolv.config import get_settings
 from resolv.core.app import build_production_graph
 from resolv.core.state import BlackboardState
+from resolv.exceptions import ResolvError
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 
@@ -49,7 +50,11 @@ def run(
     initial_state = BlackboardState(issue=issue_ref, workspace_path=workspace_path)
 
     graph = build_production_graph(settings)
-    final_state = graph.invoke(initial_state)
+    try:
+        final_state = graph.invoke(initial_state)
+    except ResolvError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1) from exc
 
     if final_state.get("test_status") == "PASSED":
         typer.echo(final_state.get("test_output") or "PR opened")
