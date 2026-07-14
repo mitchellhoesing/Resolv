@@ -16,17 +16,18 @@ from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
 from pydantic import SecretStr
 
 from resolv.adapters.coder import render_user_prompt
-from resolv.core.state import ContextChunk, IssueRef
+from resolv.core.state import IssueRef
 from resolv.exceptions import CoderError
+from resolv.utils.run_log import log_event
 
 _DEFAULT_ALLOWED_TOOLS = ("Read", "Write", "Edit", "Grep", "Glob")
 
 _SYSTEM_PROMPT = (
-    "You are Resolv, an autonomous code-fix agent. Read the issue and the "
-    "provided code context, explore the workspace as needed, and edit files "
-    "in place to resolve the issue. Make the smallest change that addresses "
-    "the reported problem. Do not attempt to run tests; a separate sandboxed "
-    "test runner will verify your patch."
+    "You are Resolv, an autonomous code-fix agent. Read the issue, explore "
+    "the workspace as needed, and edit files in place to resolve the issue. "
+    "Make the smallest change that addresses the reported problem. Do not "
+    "attempt to run tests; a separate sandboxed test runner will verify "
+    "your patch."
 )
 
 
@@ -74,10 +75,10 @@ class ClaudeCodeBackend:
         self,
         issue: IssueRef,
         workspace_path: Path,
-        pruned_context: list[ContextChunk],
         prior_feedback: str | None,
     ) -> None:
-        user_prompt = render_user_prompt(issue, pruned_context, prior_feedback)
+        user_prompt = render_user_prompt(issue, prior_feedback)
+        log_event(user_prompt)
         # Scope the key to the SDK subprocess only; an empty key is omitted so
         # local runs can fall back to the host's logged-in Claude credentials.
         sdk_env: dict[str, str] = {}

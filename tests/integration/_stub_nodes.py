@@ -12,7 +12,7 @@ from resolv.core.state import BlackboardState, IterationRecord
 
 
 def stub_context_broker(state: BlackboardState) -> dict[str, Any]:
-    return {"pruned_context": [], "scip_index_path": None}
+    return {}
 
 
 def stub_coder(state: BlackboardState) -> dict[str, Any]:

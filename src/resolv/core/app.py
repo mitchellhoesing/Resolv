@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from langgraph.graph.state import CompiledStateGraph
 
-from resolv.adapters.coder import build_coder
+from resolv.adapters.claude_code_client import ClaudeCodeBackend, ClaudeCodeClient
 from resolv.adapters.github_client import GitHubClient
 from resolv.config import Settings, get_settings
 from resolv.core.graph import build_graph
@@ -16,18 +16,15 @@ from resolv.nodes.test_runner import make_test_runner_node
 
 def build_production_graph(settings: Settings | None = None) -> CompiledStateGraph:
     settings = settings or get_settings()
-    coder_backend = build_coder(
-        backend=settings.coder.backend,
-        claude_model=settings.coder.claude_model,
+    coder_backend = ClaudeCodeBackend(
+        ClaudeCodeClient(),
+        model=settings.coder.claude_model,
         anthropic_api_key=settings.anthropic_api_key,
-        litellm_model=settings.coder.litellm_model,
-        litellm_api_key=settings.openai_api_key,
     )
     github_client = GitHubClient(settings.github_token)
 
     return build_graph(
         context_broker_fn=make_context_broker_node(
-            max_chunks=settings.context.max_chunks,
             github_token=settings.github_token,
         ),
         coder_fn=make_coder_node(coder_backend),

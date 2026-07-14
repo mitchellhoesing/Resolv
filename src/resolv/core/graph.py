@@ -45,7 +45,7 @@ def build_graph(
     coder_fn: NodeFn,
     test_runner_fn: NodeFn,
     deliver_fn: NodeFn,
-    max_iterations: int = 5,
+    max_iterations: int = 3,
 ) -> CompiledStateGraph:
     graph: StateGraph = StateGraph(BlackboardState)
 

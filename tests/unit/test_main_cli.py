@@ -25,16 +25,6 @@ def test_cli_rejects_bad_repo_format() -> None:
     assert "owner/name" in result.output
 
 
-def test_cli_rejects_unknown_backend(mocker: MockerFixture) -> None:
-    mocker.patch("resolv.main.get_settings", return_value=_stub_settings())
-    mocker.patch("resolv.main.GitHubClient")
-    result = runner.invoke(
-        app, ["run", "--repo", "a/b", "--issue", "1", "--backend", "vibes"]
-    )
-    assert result.exit_code == 2
-    assert "unknown --backend" in result.output
-
-
 def test_cli_success_path_reports_pr_url(mocker: MockerFixture) -> None:
     mocker.patch("resolv.main.get_settings", return_value=_stub_settings())
     github = MagicMock()
@@ -72,22 +62,3 @@ def test_cli_stall_path_exits_nonzero(mocker: MockerFixture) -> None:
     result = runner.invoke(app, ["run", "--repo", "a/b", "--issue", "1"])
     assert result.exit_code == 1
     assert "did not converge" in result.output
-
-
-def test_cli_backend_override_propagates(mocker: MockerFixture) -> None:
-    mocker.patch("resolv.main.get_settings", return_value=_stub_settings())
-    github = MagicMock()
-    github.fetch_issue.return_value = IssueRef(
-        owner="a", repo="b", number=1, title="t", body="", labels=()
-    )
-    mocker.patch("resolv.main.GitHubClient", return_value=github)
-    build = mocker.patch("resolv.main.build_production_graph")
-    build.return_value.invoke.return_value = {
-        "test_status": "PASSED",
-        "test_output": "ok",
-        "iteration": 1,
-    }
-
-    runner.invoke(app, ["run", "--repo", "a/b", "--issue", "1", "--backend", "litellm"])
-    forwarded_settings = build.call_args.args[0]
-    assert forwarded_settings.coder.backend == "litellm"

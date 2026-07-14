@@ -18,7 +18,8 @@ def _patched_settings(**overrides: object) -> Settings:
 
 def test_build_production_graph_wires_all_nodes(mocker: MockerFixture) -> None:
     mocker.patch("resolv.core.app.GitHubClient", return_value=MagicMock())
-    mocker.patch("resolv.core.app.build_coder", return_value=MagicMock())
+    mocker.patch("resolv.core.app.ClaudeCodeBackend", return_value=MagicMock())
+    mocker.patch("resolv.core.app.ClaudeCodeClient", return_value=MagicMock())
     fake_build_graph = mocker.patch(
         "resolv.core.app.build_graph", return_value=MagicMock()
     )

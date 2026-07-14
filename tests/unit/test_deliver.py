@@ -14,6 +14,18 @@ from resolv.exceptions import DeliveryError
 from resolv.nodes.deliver import make_deliver_node
 
 
+@pytest.fixture(autouse=True)
+def _isolate_log_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+
+def _read_run_log(tmp_path: Path) -> str:
+    return "\n".join(
+        log_file.read_text(encoding="utf-8")
+        for log_file in (tmp_path / "logs").glob("*.log")
+    )
+
+
 @pytest.fixture
 def state(tmp_path: Path) -> BlackboardState:
     issue = IssueRef(
@@ -53,6 +65,13 @@ def test_creates_branch_commits_pushes_and_opens_pr(
     assert "Resolves #7" in pr_kwargs["body"]
     assert "PR opened: https://github.com/acme/widgets/pull/9" in result["test_output"]
 
+    log_contents = _read_run_log(state.workspace_path)
+    assert "repo=acme/widgets" in log_contents
+    assert "branch=resolv/issue-7" in log_contents
+    assert 'commit="fix: resolve issue #7' in log_contents
+    assert "issue=#7" in log_contents
+    assert "pr=https://github.com/acme/widgets/pull/9" in log_contents
+
 
 def test_wraps_git_failure_in_delivery_error(
     mocker: MockerFixture, state: BlackboardState
@@ -66,3 +85,4 @@ def test_wraps_git_failure_in_delivery_error(
     with pytest.raises(DeliveryError, match="git operation failed"):
         node(state)
     github.open_pull_request.assert_not_called()
+    assert "[deliver] error: git operation failed" in _read_run_log(state.workspace_path)

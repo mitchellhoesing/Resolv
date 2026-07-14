@@ -11,7 +11,7 @@ python -m venv venv
 pip install -e ".[dev]"
 ```
 
-Copy `.env.example` to `.env` and fill in `GITHUB_TOKEN`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and `GITHUB_WEBHOOK_SECRET`.
+Copy `.env.example` to `.env` and fill in `GITHUB_TOKEN`, `ANTHROPIC_API_KEY`, and `GITHUB_WEBHOOK_SECRET`.
 
 ## Run
 

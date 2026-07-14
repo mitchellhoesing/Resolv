@@ -8,22 +8,27 @@ from typing import Any, Callable
 
 from resolv.adapters.coder import CoderBackend
 from resolv.core.state import BlackboardState
+from resolv.utils.run_log import log_event
 
 
 def make_coder_node(
     backend: CoderBackend,
 ) -> Callable[[BlackboardState], dict[str, Any]]:
     def coder_node(state: BlackboardState) -> dict[str, Any]:
+        log_event(f"[coder] iteration {state.iteration + 1} started")
         if state.iteration > 0:
             _reset_workspace(state.workspace_path)
 
         prior_feedback = _compose_feedback(state)
-        backend.generate_patch(
-            issue=state.issue,
-            workspace_path=state.workspace_path,
-            pruned_context=state.pruned_context,
-            prior_feedback=prior_feedback,
-        )
+        try:
+            backend.generate_patch(
+                issue=state.issue,
+                workspace_path=state.workspace_path,
+                prior_feedback=prior_feedback,
+            )
+        except Exception as exc:
+            log_event(f"[coder] error: {exc}")
+            raise
         diff = _capture_diff(state.workspace_path)
         return {
             "current_diff": diff,

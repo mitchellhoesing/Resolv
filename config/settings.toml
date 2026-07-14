@@ -1,13 +1,8 @@
 [coder]
-backend = "claude_code"
 claude_model = "claude-opus-4-7"
-litellm_model = "gpt-4o"
 
 [loop]
-max_iterations = 5
-
-[context]
-max_chunks = 20
+max_iterations = 3
 
 [delivery]
 base_branch = "main"

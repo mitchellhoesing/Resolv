@@ -26,6 +26,7 @@ htmlcov/
 
 # Resolv runtime state
 workspaces/
+logs/
 
 # Local notes
 TODO.md
@@ -36,3 +37,6 @@ TODO.md
 *.swp
 .DS_Store
 Thumbs.db
+
+# Claude
+.claude/

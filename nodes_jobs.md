@@ -1,12 +1,8 @@
-* **Node 1 — Context Broker (nodes/context_broker.py:60)**
-* **Job:** clone the repo and pick the code snippets worth showing the LLM.
-* **1.** Clone if needed (:62) — if workspace/.git is absent, _clone (:117) does an authenticated https://@[github.com/](https://github.com/)... clone via GitPython. Failures become IngestionError.
-* **2.** Build a haystack (:65) — title + body, lowercased.
-* **3.** Walk first-party Python (:69) — rglob("*.py"), skipping anything under .git, venvs, site-packages, etc. (_EXCLUDED_DIRS, :31).
-* **4.** Extract definitions — extract_definitions (ast_tools.py:21) parses each file with tree-sitter and returns top-level function/class/decorated defs with their name, source snippet, and 1-based line span.
-* **5.** Match vs. fallback (:87) — if a definition's name appears in the issue text, it's a matched candidate; otherwise it's held as fallback. It stops early once matched hits max_chunks. If nothing matched, it uses the first max_chunks fallbacks (:94). This is the "v1 simplification" the docstring flags — crude name-substring matching, SCIP cross-file resolution deferred (hence scip_index_path is always None).
-* **6.** Attach provenance — _finalize (:99) runs blame_provenance (git_provenance.py:16) on each chunk's line span: a git blame --line-porcelain, parsed into up to 3 entries of    — , most recent first. Best-effort — any git failure returns (). The point: tell the coder who changed these exact lines and why before it rewrites them.
-* **Returns:** {"pruned_context": [...], "scip_index_path": None}.
+* **Node 1 — Context Broker (nodes/context_broker.py)**
+* **Job:** ensure the target repo is present in the workspace.
+* **1.** Clone if needed — if workspace/.git is absent, _clone does an authenticated https://@[github.com/](https://github.com/)... clone via GitPython. Failures become IngestionError.
+* Snippet extraction (tree-sitter name matching + git-blame provenance) was removed in the v2 simplification; the agentic coder explores the workspace itself.
+* **Returns:** {} (no state updates).
 
 
 
@@ -16,7 +12,7 @@
 * **Job:** mutate the workspace in place to attempt a fix, then capture the diff.
 * **1.** Reset on retry (:17) — on iteration > 0, _reset_workspace runs git reset --hard + git clean -fdx, throwing away the previous failed attempt. Each attempt starts from a clean tree — attempts don't stack.
 * **2.** Compose feedback (_compose_feedback, :41) — on retries, builds a prompt block from history: every prior attempt's diff and (if FAILED) its test output, prefixed with "these failed, don't repeat them." This is how the loop learns.
-* **3.** Dispatch to the backend (:21) — calls backend.generate_patch(...). The backend is a Protocol (adapters/coder.py:20), chosen by build_coder (:30): either claude_code (Claude Code SDK) or litellm. The shared prompt is built by render_user_prompt (:52), which lays out the issue, each context chunk with its blame provenance, and any prior feedback. The backend edits files directly; it returns nothing.
+* **3.** Dispatch to the backend (:21) — calls backend.generate_patch(...). The backend is a Protocol (adapters/coder.py) implemented by ClaudeCodeBackend (Claude Agent SDK). The prompt is built by render_user_prompt, which lays out the issue and any prior feedback. The backend edits files directly; it returns nothing.
 * **4.** Capture the diff (_capture_diff, :69) — git diff HEAD.
 * **Returns:** {current_diff, iteration+1, test_status: "PENDING", test_output: None} — resetting status for the test runner.
 

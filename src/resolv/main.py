@@ -3,7 +3,6 @@
 Example:
 
     resolv run --repo octocat/Hello-World --issue 1
-    resolv run --repo octocat/Hello-World --issue 1 --backend litellm
 """
 
 from __future__ import annotations
@@ -14,7 +13,7 @@ from pathlib import Path
 import typer
 
 from resolv.adapters.github_client import GitHubClient
-from resolv.config import Settings, get_settings
+from resolv.config import get_settings
 from resolv.core.app import build_production_graph
 from resolv.core.state import BlackboardState
 
@@ -30,9 +29,6 @@ def _main() -> None:
 def run(
     repo: str = typer.Option(..., "--repo", help="Target repository as owner/name."),
     issue: int = typer.Option(..., "--issue", help="Issue number to resolve."),
-    backend: str | None = typer.Option(
-        None, "--backend", help="Coder backend override: claude_code or litellm."
-    ),
     workspace_root: Path = typer.Option(
         Path("/workspace"),
         "--workspace-root",
@@ -45,7 +41,7 @@ def run(
         raise typer.Exit(2)
     owner, name = repo.split("/", 1)
 
-    settings = _apply_backend_override(get_settings(), backend)
+    settings = get_settings()
     github_client = GitHubClient(settings.github_token)
     issue_ref = github_client.fetch_issue(owner, name, issue)
 
@@ -64,17 +60,6 @@ def run(
         err=True,
     )
     raise typer.Exit(1)
-
-
-def _apply_backend_override(settings: Settings, backend: str | None) -> Settings:
-    if backend is None:
-        return settings
-    if backend not in {"claude_code", "litellm"}:
-        typer.echo(f"error: unknown --backend {backend!r}", err=True)
-        raise typer.Exit(2)
-    return settings.model_copy(
-        update={"coder": settings.coder.model_copy(update={"backend": backend})}
-    )
 
 
 if __name__ == "__main__":
