@@ -1,4 +1,4 @@
-"""Shared run log — appends pipeline events to per-minute UTC files in logs/."""
+"""Shared run log — echoes pipeline events to stdout and appends them to per-minute UTC files in logs/."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ def log_event(message: str) -> None:
     (DD-MM-YYYYTHH-MMZ). Messages logged within the same minute are
     appended to the same file, separated by a delimiter line.
     """
+    print(message, flush=True)
     _LOG_DIRECTORY.mkdir(exist_ok=True)
     log_file_name = datetime.now(timezone.utc).strftime("%d-%m-%YT%H-%MZ") + ".log"
     with (_LOG_DIRECTORY / log_file_name).open("a", encoding="utf-8") as log_file:

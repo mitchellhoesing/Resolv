@@ -12,7 +12,13 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
+from claude_agent_sdk import (
+    AssistantMessage,
+    ClaudeAgentOptions,
+    ResultMessage,
+    ToolUseBlock,
+    query,
+)
 from pydantic import SecretStr
 
 from resolv.adapters.coder import render_user_prompt
@@ -54,8 +60,19 @@ class ClaudeCodeClient:
         )
         final_result = ""
         async for message in query(prompt=prompt, options=options):
-            if isinstance(message, ResultMessage):
-                final_result = getattr(message, "result", "") or ""
+            if isinstance(message, AssistantMessage) and message.usage:
+                tool_names = [
+                    block.name
+                    for block in message.content
+                    if isinstance(block, ToolUseBlock)
+                ]
+                log_event(f"[coder-agent] turn usage={message.usage} tools={tool_names}")
+            elif isinstance(message, ResultMessage):
+                log_event(
+                    f"[coder-agent] run complete: turns={message.num_turns} "
+                    f"cost_usd={message.total_cost_usd} usage={message.usage}"
+                )
+                final_result = message.result or ""
         return final_result
 
 
@@ -78,7 +95,6 @@ class ClaudeCodeBackend:
         prior_feedback: str | None,
     ) -> None:
         user_prompt = render_user_prompt(issue, prior_feedback)
-        log_event(user_prompt)
         # Scope the key to the SDK subprocess only; an empty key is omitted so
         # local runs can fall back to the host's logged-in Claude credentials.
         sdk_env: dict[str, str] = {}
