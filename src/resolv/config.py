@@ -38,6 +38,7 @@ class DeliverySettings(BaseModel):
 class SandboxSettings(BaseModel):
     image_tag: str = "resolv-sandbox:latest"  # image the host launches per issue
     test_timeout_seconds: int = Field(default=600, ge=30)
+    install_timeout_seconds: int = Field(default=900, ge=60)
 
 
 class WebhookSettings(BaseModel):

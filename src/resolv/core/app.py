@@ -11,6 +11,7 @@ from resolv.core.graph import build_graph
 from resolv.nodes.coder import make_coder_node
 from resolv.nodes.context_broker import make_context_broker_node
 from resolv.nodes.deliver import make_deliver_node
+from resolv.nodes.env_installer import make_env_installer_node
 from resolv.nodes.test_runner import make_test_runner_node
 
 
@@ -26,6 +27,9 @@ def build_production_graph(settings: Settings | None = None) -> CompiledStateGra
     return build_graph(
         context_broker_fn=make_context_broker_node(
             github_token=settings.github_token,
+        ),
+        env_installer_fn=make_env_installer_node(
+            timeout=settings.sandbox.install_timeout_seconds,
         ),
         coder_fn=make_coder_node(coder_backend),
         test_runner_fn=make_test_runner_node(

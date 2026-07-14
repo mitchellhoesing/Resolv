@@ -31,11 +31,18 @@ def test_build_production_graph_wires_all_nodes(mocker: MockerFixture) -> None:
     kwargs = fake_build_graph.call_args.kwargs
     assert set(kwargs) == {
         "context_broker_fn",
+        "env_installer_fn",
         "coder_fn",
         "test_runner_fn",
         "deliver_fn",
         "max_iterations",
     }
     assert kwargs["max_iterations"] == settings.loop.max_iterations
-    for key in ("context_broker_fn", "coder_fn", "test_runner_fn", "deliver_fn"):
+    for key in (
+        "context_broker_fn",
+        "env_installer_fn",
+        "coder_fn",
+        "test_runner_fn",
+        "deliver_fn",
+    ):
         assert callable(kwargs[key])

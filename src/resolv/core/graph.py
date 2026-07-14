@@ -2,7 +2,7 @@
 
 The graph wires:
 
-    START -> context_broker -> coder -> test_runner -> gate
+    START -> context_broker -> env_installer -> coder -> test_runner -> gate
     gate -> deliver -> END                          (tests PASSED)
     gate -> coder                                   (loop with feedback, iteration < max)
     gate -> END                                     (stall — LoopStallError logged by caller)
@@ -42,6 +42,7 @@ def _make_gate_router(max_iterations: int) -> Callable[[BlackboardState], str]:
 def build_graph(
     *,
     context_broker_fn: NodeFn,
+    env_installer_fn: NodeFn,
     coder_fn: NodeFn,
     test_runner_fn: NodeFn,
     deliver_fn: NodeFn,
@@ -53,12 +54,14 @@ def build_graph(
     # don't match a plain Callable[[BlackboardState], dict[str, Any]]; the
     # calls work at runtime.
     graph.add_node("context_broker", context_broker_fn)  # type: ignore[call-overload]
+    graph.add_node("env_installer", env_installer_fn)  # type: ignore[call-overload]
     graph.add_node("coder", coder_fn)  # type: ignore[call-overload]
     graph.add_node("test_runner", test_runner_fn)  # type: ignore[call-overload]
     graph.add_node("deliver", deliver_fn)  # type: ignore[call-overload]
 
     graph.add_edge(START, "context_broker")
-    graph.add_edge("context_broker", "coder")
+    graph.add_edge("context_broker", "env_installer")
+    graph.add_edge("env_installer", "coder")
     graph.add_edge("coder", "test_runner")
     graph.add_conditional_edges(
         "test_runner",
