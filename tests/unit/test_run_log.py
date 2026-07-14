@@ -22,6 +22,7 @@ def test_log_event_appends_to_timestamped_file(
     # DD-MM-YYYYTHH-MMZ, e.g. 08-07-2026T14-32Z
     assert re.fullmatch(r"\d{2}-\d{2}-\d{4}T\d{2}-\d{2}Z\.log", log_files[0].name)
     contents = log_files[0].read_text(encoding="utf-8")
-    assert "first event" in contents
-    assert "second event" in contents
+    # Each line is prefixed with the UTC time of day, e.g. 14:32:07Z
+    assert re.search(r"\d{2}:\d{2}:\d{2}Z first event", contents)
+    assert re.search(r"\d{2}:\d{2}:\d{2}Z second event", contents)
     assert "=" * 80 in contents

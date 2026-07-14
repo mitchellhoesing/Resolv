@@ -50,6 +50,7 @@ def make_test_runner_node(
         if command is None:
             log_event("[test_runner] error: no test runner detected")
             return _record_and_return(state, "FAILED", "no test runner detected")
+        log_event(f"[test_runner] running: {' '.join(command)}")
         try:
             result = sandbox_runner(
                 command,

@@ -29,8 +29,9 @@ COPY pyproject.toml README.md ./
 COPY src/ ./src/
 COPY config/ ./config/
 
-# resolv + runtime deps, plus the test runners target repos invoke.
-RUN pip install --no-cache-dir -e . pytest tox
+# resolv + runtime deps and the dev extra (pytest, pytest-mock, pytest-cov),
+# plus tox for target repos that invoke it.
+RUN pip install --no-cache-dir -e ".[dev]" tox
 
 WORKDIR /workspace
 
