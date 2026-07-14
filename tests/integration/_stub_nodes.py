@@ -15,6 +15,10 @@ def stub_context_broker(state: BlackboardState) -> dict[str, Any]:
     return {}
 
 
+def stub_env_installer(state: BlackboardState) -> dict[str, Any]:
+    return {}
+
+
 def stub_coder(state: BlackboardState) -> dict[str, Any]:
     return {
         "current_diff": "--- a/stub\n+++ b/stub\n",

@@ -13,6 +13,7 @@ from tests.integration._stub_nodes import (
     stub_coder,
     stub_context_broker,
     stub_deliver,
+    stub_env_installer,
     stub_test_runner,
 )
 
@@ -28,6 +29,7 @@ def initial_state(tmp_path: Path) -> BlackboardState:
 def _default_wiring(**overrides: Any) -> dict[str, Any]:
     defaults: dict[str, Any] = {
         "context_broker_fn": stub_context_broker,
+        "env_installer_fn": stub_env_installer,
         "coder_fn": stub_coder,
         "test_runner_fn": stub_test_runner,
         "deliver_fn": stub_deliver,
