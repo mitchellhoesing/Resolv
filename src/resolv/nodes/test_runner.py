@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from resolv.core.state import BlackboardState, IterationRecord
+from resolv.nodes.env_installer import venv_path_for
 from resolv.utils.run_log import log_event
 from resolv.utils.sandbox import run_isolated
 
@@ -51,11 +52,15 @@ def make_test_runner_node(
             log_event("[test_runner] error: no test runner detected")
             return _record_and_return(state, "FAILED", "no test runner detected")
         log_event(f"[test_runner] running: {' '.join(command)}")
+        # Prefer the per-repo venv's binaries when the env_installer created one;
+        # image binaries remain as PATH fallback.
+        venv = venv_path_for(state.workspace_path)
         try:
             result = sandbox_runner(
                 command,
                 state.workspace_path,
                 timeout=timeout,
+                venv_path=venv if venv.is_dir() else None,
             )
         except Exception as exc:
             log_event(f"[test_runner] error: {exc}")

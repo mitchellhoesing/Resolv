@@ -84,6 +84,28 @@ def test_node_marks_passed_on_zero_exit(state: BlackboardState) -> None:
     assert call_kwargs["timeout"] == 60
 
 
+def test_node_passes_venv_path_when_venv_exists(state: BlackboardState) -> None:
+    (state.workspace_path / "conftest.py").write_text("")
+    venv = state.workspace_path.parent / f"{state.workspace_path.name}__venv"
+    venv.mkdir()
+    runner = MagicMock(
+        return_value=SandboxResult(exit_code=0, stdout="3 passed", stderr="")
+    )
+    node = make_test_runner_node(timeout=60, sandbox_runner=runner)
+    node(state)
+    assert runner.call_args.kwargs["venv_path"] == venv
+
+
+def test_node_passes_no_venv_path_when_venv_absent(state: BlackboardState) -> None:
+    (state.workspace_path / "conftest.py").write_text("")
+    runner = MagicMock(
+        return_value=SandboxResult(exit_code=0, stdout="3 passed", stderr="")
+    )
+    node = make_test_runner_node(timeout=60, sandbox_runner=runner)
+    node(state)
+    assert runner.call_args.kwargs["venv_path"] is None
+
+
 def test_node_marks_failed_on_nonzero_exit(state: BlackboardState) -> None:
     (state.workspace_path / "conftest.py").write_text("")
     runner = MagicMock(
