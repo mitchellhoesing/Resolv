@@ -16,6 +16,7 @@ from resolv.adapters.github_client import GitHubClient
 from resolv.config import get_settings
 from resolv.core.app import build_production_graph
 from resolv.core.state import BlackboardState
+from resolv.dispatch import dispatch_issue
 from resolv.exceptions import ResolvError
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
@@ -24,6 +25,15 @@ app = typer.Typer(no_args_is_help=True, add_completion=False)
 @app.callback()
 def _main() -> None:
     """Resolv — autonomous issue-to-PR pipeline."""
+
+
+def _split_repo(repo: str) -> tuple[str, str]:
+    """Split an 'owner/name' argument, exiting 2 on bad format."""
+    if "/" not in repo:
+        typer.echo("error: --repo must be in 'owner/name' form", err=True)
+        raise typer.Exit(2)
+    owner, name = repo.split("/", 1)
+    return owner, name
 
 
 @app.command()
@@ -36,11 +46,8 @@ def run(
         help="Directory under which per-issue workspaces are created (in-container default).",
     ),
 ) -> None:
-    """Run the autonomous issue-to-PR pipeline for a single issue."""
-    if "/" not in repo:
-        typer.echo("error: --repo must be in 'owner/name' form", err=True)
-        raise typer.Exit(2)
-    owner, name = repo.split("/", 1)
+    """Run the pipeline in-process for a single issue (inside the sandbox container)."""
+    owner, name = _split_repo(repo)
 
     settings = get_settings()
     github_client = GitHubClient(settings.github_token)
@@ -65,6 +72,18 @@ def run(
         err=True,
     )
     raise typer.Exit(1)
+
+
+@app.command()
+def dispatch(
+    repo: str = typer.Option(..., "--repo", help="Target repository as owner/name."),
+    issue: int = typer.Option(..., "--issue", help="Issue number to resolve."),
+) -> None:
+    """Launch a disposable per-issue container that runs `resolv run` (host-side)."""
+    owner, name = _split_repo(repo)
+    settings = get_settings()
+    exit_code = dispatch_issue(settings, owner, name, issue)
+    raise typer.Exit(exit_code)
 
 
 if __name__ == "__main__":
