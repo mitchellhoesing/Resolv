@@ -16,14 +16,13 @@ import hashlib
 import hmac
 import json
 import logging
-import os
-import subprocess
 from contextlib import asynccontextmanager
 from typing import Any, Awaitable, Callable
 
 from fastapi import FastAPI, Header, HTTPException, Request
 
 from resolv.config import Settings, get_settings
+from resolv.dispatch import dispatch_issue
 
 logger = logging.getLogger(__name__)
 
@@ -58,28 +57,13 @@ def _extract_work_item(payload: dict[str, Any]) -> WorkItem:
 def _default_runner(settings: Settings) -> Runner:
     """Dispatch each issue to its own disposable container running `resolv run`.
 
-    Secrets are passed through by name (`-e NAME`, no value) so they reach the
-    container's env without appearing in the host process's argv. The container
-    fetches the issue, clones, codes, tests, and pushes — the host only launches
-    it. CAP_SYS_ADMIN is required for the in-container test isolation.
+    Container construction and secret handling live in `resolv.dispatch`, which
+    the `resolv dispatch` CLI command shares.
     """
-    image_tag = settings.sandbox.image_tag
 
     async def run(item: WorkItem) -> None:
         owner, repo, number = item
-        command = [
-            "docker", "run", "--rm", "--cap-add=SYS_ADMIN",
-            "-e", "RESOLV_GITHUB_TOKEN",
-            "-e", "RESOLV_ANTHROPIC_API_KEY",
-            image_tag,
-            "run", "--repo", f"{owner}/{repo}", "--issue", str(number),
-        ]
-        env = {
-            **os.environ,
-            "RESOLV_GITHUB_TOKEN": settings.github_token.get_secret_value(),
-            "RESOLV_ANTHROPIC_API_KEY": settings.anthropic_api_key.get_secret_value(),
-        }
-        await asyncio.to_thread(subprocess.run, command, env=env, check=False)
+        await asyncio.to_thread(dispatch_issue, settings, owner, repo, number)
 
     return run
 

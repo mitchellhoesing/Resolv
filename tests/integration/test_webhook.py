@@ -157,7 +157,7 @@ def test_default_runner_dispatches_per_issue_container(mocker: MockerFixture) ->
         github_token=SecretStr("ghp_secret"),
         anthropic_api_key=SecretStr("sk-secret"),
     )
-    run_mock = mocker.patch("resolv.webhook.subprocess.run")
+    run_mock = mocker.patch("resolv.dispatch.subprocess.run")
 
     runner = _default_runner(settings)
     asyncio.run(runner(("acme", "widgets", 7)))
