@@ -20,8 +20,9 @@ resolv-pipeline/
 ├── src/
 │   └── resolv/
 │       ├── __init__.py
-│       ├── main.py                # Typer CLI entrypoint (`resolv run --repo owner/name --issue N`)
+│       ├── main.py                # Typer CLI entrypoint (`resolv run` in-container, `resolv dispatch` host-side)
 │       ├── webhook.py             # FastAPI GitHub webhook listener; launches a per-issue container per event
+│       ├── dispatch.py            # Host-side per-issue `docker run` launcher shared by webhook and CLI
 │       ├── config.py              # Configuration loading via Pydantic Settings
 │       ├── exceptions.py          # Centralized custom exceptions (e.g., LoopStallError)
 │       │

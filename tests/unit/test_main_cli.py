@@ -62,3 +62,31 @@ def test_cli_stall_path_exits_nonzero(mocker: MockerFixture) -> None:
     result = runner.invoke(app, ["run", "--repo", "a/b", "--issue", "1"])
     assert result.exit_code == 1
     assert "did not converge" in result.output
+
+
+def test_cli_dispatch_rejects_bad_repo_format() -> None:
+    result = runner.invoke(app, ["dispatch", "--repo", "no-slash", "--issue", "1"])
+    assert result.exit_code == 2
+    assert "owner/name" in result.output
+
+
+def test_cli_dispatch_launches_container_and_mirrors_exit_code(
+    mocker: MockerFixture,
+) -> None:
+    settings = _stub_settings()
+    mocker.patch("resolv.main.get_settings", return_value=settings)
+    dispatch_mock = mocker.patch("resolv.main.dispatch_issue", return_value=0)
+
+    result = runner.invoke(app, ["dispatch", "--repo", "acme/widgets", "--issue", "7"])
+
+    assert result.exit_code == 0
+    dispatch_mock.assert_called_once_with(settings, "acme", "widgets", 7)
+
+
+def test_cli_dispatch_propagates_container_failure(mocker: MockerFixture) -> None:
+    mocker.patch("resolv.main.get_settings", return_value=_stub_settings())
+    mocker.patch("resolv.main.dispatch_issue", return_value=17)
+
+    result = runner.invoke(app, ["dispatch", "--repo", "acme/widgets", "--issue", "7"])
+
+    assert result.exit_code == 17
