@@ -80,7 +80,7 @@ def test_cli_dispatch_launches_container_and_mirrors_exit_code(
     result = runner.invoke(app, ["dispatch", "--repo", "acme/widgets", "--issue", "7"])
 
     assert result.exit_code == 0
-    dispatch_mock.assert_called_once_with(settings, "acme", "widgets", 7)
+    dispatch_mock.assert_called_once_with(settings, "acme", "widgets", 7, dry_run=False)
 
 
 def test_cli_dispatch_propagates_container_failure(mocker: MockerFixture) -> None:
@@ -90,3 +90,70 @@ def test_cli_dispatch_propagates_container_failure(mocker: MockerFixture) -> Non
     result = runner.invoke(app, ["dispatch", "--repo", "acme/widgets", "--issue", "7"])
 
     assert result.exit_code == 17
+
+
+def test_cli_run_dry_run_forwards_flag_to_production_graph(
+    mocker: MockerFixture,
+) -> None:
+    mocker.patch("resolv.main.get_settings", return_value=_stub_settings())
+    github = MagicMock()
+    github.fetch_issue.return_value = IssueRef(
+        owner="a", repo="b", number=1, title="t", body="", labels=()
+    )
+    mocker.patch("resolv.main.GitHubClient", return_value=github)
+    graph = MagicMock()
+    graph.invoke.return_value = {
+        "test_status": "PASSED",
+        "test_output": "DRY RUN: PR not opened for resolv/issue-1",
+        "iteration": 1,
+    }
+    build_graph_mock = mocker.patch(
+        "resolv.main.build_production_graph", return_value=graph
+    )
+
+    result = runner.invoke(
+        app, ["run", "--repo", "a/b", "--issue", "1", "--dry-run"]
+    )
+
+    assert result.exit_code == 0
+    assert "DRY RUN" in result.output
+    assert build_graph_mock.call_args.kwargs["dry_run"] is True
+
+
+def test_cli_run_defaults_dry_run_off(mocker: MockerFixture) -> None:
+    mocker.patch("resolv.main.get_settings", return_value=_stub_settings())
+    github = MagicMock()
+    github.fetch_issue.return_value = IssueRef(
+        owner="a", repo="b", number=1, title="t", body="", labels=()
+    )
+    mocker.patch("resolv.main.GitHubClient", return_value=github)
+    graph = MagicMock()
+    graph.invoke.return_value = {
+        "test_status": "PASSED",
+        "test_output": "PR opened: https://github.com/a/b/pull/9",
+        "iteration": 1,
+    }
+    build_graph_mock = mocker.patch(
+        "resolv.main.build_production_graph", return_value=graph
+    )
+
+    result = runner.invoke(app, ["run", "--repo", "a/b", "--issue", "1"])
+
+    assert result.exit_code == 0
+    assert build_graph_mock.call_args.kwargs["dry_run"] is False
+
+
+def test_cli_dispatch_forwards_dry_run(mocker: MockerFixture) -> None:
+    settings = _stub_settings()
+    mocker.patch("resolv.main.get_settings", return_value=settings)
+    dispatch_mock = mocker.patch("resolv.main.dispatch_issue", return_value=0)
+
+    result = runner.invoke(
+        app,
+        ["dispatch", "--repo", "acme/widgets", "--issue", "7", "--dry-run"],
+    )
+
+    assert result.exit_code == 0
+    dispatch_mock.assert_called_once_with(
+        settings, "acme", "widgets", 7, dry_run=True
+    )

@@ -18,21 +18,36 @@ from resolv.config import Settings
 
 
 def build_dispatch_command(
-    settings: Settings, owner: str, repo: str, number: int
+    settings: Settings,
+    owner: str,
+    repo: str,
+    number: int,
+    *,
+    dry_run: bool = False,
 ) -> list[str]:
     """Build the `docker run` argv for one issue. Secret values never appear here."""
-    return [
+    command = [
         "docker", "run", "--rm", "--cap-add=SYS_ADMIN",
         "-e", "RESOLV_GITHUB_TOKEN",
         "-e", "RESOLV_ANTHROPIC_API_KEY",
         settings.sandbox.image_tag,
         "run", "--repo", f"{owner}/{repo}", "--issue", str(number),
     ]
+    if dry_run:
+        command.append("--dry-run")
+    return command
 
 
-def dispatch_issue(settings: Settings, owner: str, repo: str, number: int) -> int:
+def dispatch_issue(
+    settings: Settings,
+    owner: str,
+    repo: str,
+    number: int,
+    *,
+    dry_run: bool = False,
+) -> int:
     """Run the per-issue container to completion and return its exit code."""
-    command = build_dispatch_command(settings, owner, repo, number)
+    command = build_dispatch_command(settings, owner, repo, number, dry_run=dry_run)
     env = {
         **os.environ,
         "RESOLV_GITHUB_TOKEN": settings.github_token.get_secret_value(),

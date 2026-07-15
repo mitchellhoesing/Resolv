@@ -81,3 +81,49 @@ def test_wraps_git_failure_in_delivery_error(
         node(state)
     github.open_pull_request.assert_not_called()
     assert "[deliver] error: git operation failed" in _read_run_log(state.workspace_path)
+
+
+def test_dry_run_skips_git_and_pr_and_logs_diff_and_tests(
+    mocker: MockerFixture, state: BlackboardState
+) -> None:
+    fake_repo_cls = mocker.patch("resolv.nodes.deliver.Repo")
+    github = MagicMock()
+    state.current_diff = "--- a/foo.py\n+++ b/foo.py\n@@ -1 +1 @@\n-old\n+new\n"
+    state.test_status = "PASSED"
+    state.test_output = "5 passed, 0 failed"
+
+    node = make_deliver_node(github_client=github, dry_run=True)
+    result = node(state)
+
+    # No git or GitHub side effects.
+    fake_repo_cls.assert_not_called()
+    github.open_pull_request.assert_not_called()
+
+    assert "DRY RUN" in result["test_output"]
+    assert "resolv/issue-7" in result["test_output"]
+
+    log_contents = _read_run_log(state.workspace_path)
+    assert "dry-run" in log_contents
+    assert "resolv/issue-7" in log_contents
+    assert "+new" in log_contents  # diff echoed
+    assert "5 passed, 0 failed" in log_contents  # sandbox test results echoed
+    assert "test_status=PASSED" in log_contents
+
+
+def test_dry_run_handles_missing_diff_and_test_output(
+    mocker: MockerFixture, state: BlackboardState
+) -> None:
+    fake_repo_cls = mocker.patch("resolv.nodes.deliver.Repo")
+    github = MagicMock()
+    # state.current_diff / state.test_output default to None.
+
+    node = make_deliver_node(github_client=github, dry_run=True)
+    result = node(state)
+
+    fake_repo_cls.assert_not_called()
+    github.open_pull_request.assert_not_called()
+    assert "DRY RUN" in result["test_output"]
+
+    log_contents = _read_run_log(state.workspace_path)
+    assert "(no diff captured)" in log_contents
+    assert "(no test output captured)" in log_contents

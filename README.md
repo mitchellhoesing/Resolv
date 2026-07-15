@@ -20,9 +20,15 @@ CLI (runs the pipeline in-process; this is what executes inside the sandbox cont
 resolv run --repo owner/name --issue 123
 ```
 
+Add `--dry-run` to run the full pipeline (fetch → code → sandbox tests) but stop short of opening a PR. The diff and sandbox test results are logged instead — useful for validating Resolv's output on sensitive or self-referential issues before granting it PR-write access:
+```bash
+resolv run --repo owner/name --issue 123 --dry-run
+```
+
 Manually launch one disposable per-issue container from the host (same `docker run` the webhook uses):
 ```bash
-resolv dispatch --repo owner/name --issue 123
+resolv dispatch --repo owner/name --issue 123          # opens a PR
+resolv dispatch --repo owner/name --issue 123 --dry-run  # forwards --dry-run into the container
 ```
 
 Webhook server:
