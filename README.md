@@ -15,9 +15,14 @@ Copy `.env.example` to `.env` and fill in `GITHUB_TOKEN`, `ANTHROPIC_API_KEY`, a
 
 ## Run
 
-CLI:
+CLI (runs the pipeline in-process; this is what executes inside the sandbox container):
 ```bash
 resolv run --repo owner/name --issue 123
+```
+
+Manually launch one disposable per-issue container from the host (same `docker run` the webhook uses):
+```bash
+resolv dispatch --repo owner/name --issue 123
 ```
 
 Webhook server:
