@@ -9,6 +9,12 @@ import pytest
 from resolv.core.state import BlackboardState, IssueRef
 
 
+@pytest.fixture(autouse=True)
+def _isolate_log_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """log_event appends to logs/ under the cwd; keep test logs out of the repo."""
+    monkeypatch.chdir(tmp_path)
+
+
 @pytest.fixture
 def sample_issue() -> IssueRef:
     return IssueRef(

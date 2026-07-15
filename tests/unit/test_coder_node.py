@@ -12,11 +12,6 @@ from resolv.core.state import BlackboardState, IssueRef, IterationRecord
 from resolv.nodes.coder import make_coder_node
 
 
-@pytest.fixture(autouse=True)
-def _isolate_log_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.chdir(tmp_path)
-
-
 def _read_run_log(tmp_path: Path) -> str:
     return "\n".join(
         log_file.read_text(encoding="utf-8")

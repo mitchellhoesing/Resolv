@@ -16,11 +16,6 @@ from resolv.nodes.test_runner import (
 from resolv.utils.sandbox import SandboxResult
 
 
-@pytest.fixture(autouse=True)
-def _isolate_log_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.chdir(tmp_path)
-
-
 def _read_run_log(tmp_path: Path) -> str:
     return "\n".join(
         log_file.read_text(encoding="utf-8")
