@@ -45,6 +45,14 @@ def run(
         "--workspace-root",
         help="Directory under which per-issue workspaces are created (in-container default).",
     ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help=(
+            "Run the full pipeline but skip opening the PR. Logs the diff that "
+            "would have been submitted and the sandbox test results instead."
+        ),
+    ),
 ) -> None:
     """Run the pipeline in-process for a single issue (inside the sandbox container)."""
     owner, name = _split_repo(repo)
@@ -56,7 +64,7 @@ def run(
     workspace_path = workspace_root / f"{owner}__{name}__issue-{issue}"
     initial_state = BlackboardState(issue=issue_ref, workspace_path=workspace_path)
 
-    graph = build_production_graph(settings)
+    graph = build_production_graph(settings, dry_run=dry_run)
     try:
         final_state = graph.invoke(initial_state)
     except ResolvError as exc:
@@ -78,11 +86,19 @@ def run(
 def dispatch(
     repo: str = typer.Option(..., "--repo", help="Target repository as owner/name."),
     issue: int = typer.Option(..., "--issue", help="Issue number to resolve."),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help=(
+            "Forward --dry-run to the container's `resolv run`: pipeline runs "
+            "end-to-end but no PR is opened."
+        ),
+    ),
 ) -> None:
     """Launch a disposable per-issue container that runs `resolv run` (host-side)."""
     owner, name = _split_repo(repo)
     settings = get_settings()
-    exit_code = dispatch_issue(settings, owner, name, issue)
+    exit_code = dispatch_issue(settings, owner, name, issue, dry_run=dry_run)
     raise typer.Exit(exit_code)
 
 

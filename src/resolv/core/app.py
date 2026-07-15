@@ -15,7 +15,11 @@ from resolv.nodes.env_installer import make_env_installer_node
 from resolv.nodes.test_runner import make_test_runner_node
 
 
-def build_production_graph(settings: Settings | None = None) -> CompiledStateGraph:
+def build_production_graph(
+    settings: Settings | None = None,
+    *,
+    dry_run: bool = False,
+) -> CompiledStateGraph:
     settings = settings or get_settings()
     coder_backend = ClaudeCodeBackend(
         ClaudeCodeClient(),
@@ -39,6 +43,7 @@ def build_production_graph(settings: Settings | None = None) -> CompiledStateGra
             github_client=github_client,
             base_branch=settings.delivery.base_branch,
             branch_prefix=settings.delivery.branch_prefix,
+            dry_run=dry_run,
         ),
         max_iterations=settings.loop.max_iterations,
     )
