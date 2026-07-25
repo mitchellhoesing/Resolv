@@ -7,7 +7,7 @@
 # `unshare --net` the untrusted test suite into an isolated network namespace:
 #
 #   docker run --rm --cap-add=SYS_ADMIN \
-#     -e RESOLV_GITHUB_TOKEN -e RESOLV_ANTHROPIC_API_KEY \
+#     -e RESOLV_GITHUB_TOKEN -e RESOLV_ANTHROPIC_API_KEY -e CLAUDE_CODE_OAUTH_TOKEN \
 #     resolv-sandbox:latest run --repo owner/name --issue 123
 
 FROM python:3.12-slim

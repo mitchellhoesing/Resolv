@@ -13,6 +13,7 @@ def _settings() -> Settings:
     return Settings(
         github_token=SecretStr("ghp_secret"),
         anthropic_api_key=SecretStr("sk-secret"),
+        claude_code_oauth_token=SecretStr("oauth_secret"),
     )
 
 
@@ -25,6 +26,7 @@ def test_build_dispatch_command_shape() -> None:
     # Secrets are passed through env by name only, never as argv values.
     assert "ghp_secret" not in command
     assert "sk-secret" not in command
+    assert "oauth_secret" not in command
 
 
 def test_dispatch_issue_injects_secrets_and_returns_exit_code(
@@ -42,3 +44,4 @@ def test_dispatch_issue_injects_secrets_and_returns_exit_code(
     assert kwargs["check"] is False
     assert kwargs["env"]["RESOLV_GITHUB_TOKEN"] == "ghp_secret"
     assert kwargs["env"]["RESOLV_ANTHROPIC_API_KEY"] == "sk-secret"
+    assert kwargs["env"]["CLAUDE_CODE_OAUTH_TOKEN"] == "oauth_secret"

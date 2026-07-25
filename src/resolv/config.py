@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import AliasChoices, BaseModel, Field, SecretStr
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -57,6 +57,14 @@ class Settings(BaseSettings):
     github_token: SecretStr = SecretStr("")
     anthropic_api_key: SecretStr = SecretStr("")
     github_webhook_secret: SecretStr = SecretStr("")
+    # Subscription auth for the Claude Code CLI (`claude setup-token`); the
+    # unprefixed alias matches the env var name the CLI itself expects.
+    claude_code_oauth_token: SecretStr = Field(
+        default=SecretStr(""),
+        validation_alias=AliasChoices(
+            "claude_code_oauth_token", "CLAUDE_CODE_OAUTH_TOKEN"
+        ),
+    )
 
     model_config = SettingsConfigDict(
         toml_file=str(_DEFAULT_TOML),
