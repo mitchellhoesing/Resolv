@@ -184,6 +184,8 @@ def _read_state_history(database: Path, thread_id: str) -> list[StateSnapshot]:
         coder_fn=placeholder,
         test_runner_fn=placeholder,
         deliver_fn=placeholder,
+        # Never invoked — the gate is unreachable, so any valid bound works.
+        max_iterations=1,
         checkpointer=sqlite_checkpointer(database),
     )
     config: RunnableConfig = {"configurable": {"thread_id": thread_id}}
