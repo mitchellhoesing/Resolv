@@ -18,9 +18,10 @@ pytest can see the venv's site-packages.
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from resolv.core.state import BlackboardState
 from resolv.exceptions import InstallError

@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from resolv.adapters.coder import CoderBackend
 from resolv.core.state import BlackboardState

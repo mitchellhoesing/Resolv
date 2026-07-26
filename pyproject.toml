@@ -48,6 +48,14 @@ addopts = "-q --strict-markers"
 line-length = 100
 target-version = "py310"
 
+[tool.ruff.lint]
+# Pinned explicitly so ruff version bumps can't change the enforced rule set.
+select = ["E4", "E7", "E9", "F", "B", "UP"]
+
+[tool.ruff.lint.flake8-bugbear]
+# Typer's API requires calls in argument defaults; B008 is a false positive here.
+extend-immutable-calls = ["typer.Option"]
+
 [tool.mypy]
 python_version = "3.10"
 mypy_path = "src"

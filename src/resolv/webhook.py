@@ -16,8 +16,9 @@ import hashlib
 import hmac
 import json
 import logging
+from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 from fastapi import FastAPI, Header, HTTPException, Request
 
