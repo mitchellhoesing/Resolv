@@ -11,6 +11,7 @@ readme = "README.md"
 license = { text = "MIT" }
 dependencies = [
     "langgraph>=0.2.0",
+    "langgraph-checkpoint-sqlite>=2.0",
     "langchain-core>=0.3.0",
     "pydantic>=2.7",
     "pydantic-settings>=2.4",

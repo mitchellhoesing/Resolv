@@ -46,6 +46,31 @@ def test_record_iteration_appends_history(sample_state: BlackboardState) -> None
     assert sample_state.history == [record]
 
 
+def test_summary_reports_shape_without_embedding_content(
+    sample_state: BlackboardState,
+) -> None:
+    sample_state.current_diff = "x" * 50_000
+    sample_state.test_output = "secret failure detail"
+    sample_state.test_status = "FAILED"
+    sample_state.iteration = 2
+    sample_state.record_iteration()
+
+    summary = sample_state.summary()
+
+    assert summary == (
+        "iteration=2 test_status=FAILED diff_bytes=50000 history=1"
+    )
+    # The unbounded fields must never be inlined into the log line.
+    assert "x" * 100 not in summary
+    assert "secret failure detail" not in summary
+
+
+def test_summary_handles_empty_state(sample_state: BlackboardState) -> None:
+    assert sample_state.summary() == (
+        "iteration=0 test_status=PENDING diff_bytes=0 history=0"
+    )
+
+
 def test_test_status_rejects_invalid_literal(sample_issue: IssueRef, tmp_path: Path) -> None:
     with pytest.raises(ValidationError):
         BlackboardState(

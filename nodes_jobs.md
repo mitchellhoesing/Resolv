@@ -1,3 +1,7 @@
+Every node below is wrapped by `log_node_boundaries` (core/app.py:22) at the production wiring layer, so each one logs the state it received and the keys it returned without the node modules carrying any trace code of their own. The `Returns:` dicts documented here are exactly what shows up in those `exit wrote ...` lines.
+
+---
+
 * **Node 1 — Context Broker (nodes/context_broker.py)**
 * **Job:** ensure the target repo is present in the workspace.
 * **1.** Clone if needed — if workspace/.git is absent, _clone does an authenticated https://@[github.com/](https://github.com/)... clone via GitPython. Failures become IngestionError.
@@ -39,7 +43,7 @@
 * **3.** Judge (:55) — exit code 0 → PASSED, else FAILED. Output is stdout+stderr tail-capped at 10k chars.
 * **4.** Record (_record_and_return, :62) — appends an IterationRecord to history.
 * **Returns:** {test_status, test_output, history}.
-* **Then the gate (core/graph.py:31) routes on the result:** PASSED → deliver; iteration >= max → END (stall); otherwise → back to coder with the new feedback.
+* **Then the gate (core/graph.py:46) routes on the result:** PASSED → deliver; iteration >= max → END (stall); otherwise → back to coder with the new feedback. The chosen branch is logged as `[gate] loop|stall|deliver (iteration N/max, test STATUS)`.
 
 
 
@@ -49,4 +53,4 @@
 * **Job:** ship the verified fix. Only reached when tests passed.
 * **1.** Branch + commit + push (:24) — via GitPython: create resolv/issue-, check out, add -A, commit fix: resolve issue # — , push to origin. Git failures → DeliveryError.
 * **2.** Open the PR (:35) — github_client.open_pull_request(...) against base_branch (default main), body Resolves # plus the issue text.
-* **Returns:** {"test_output": "PR opened: "} — which main.py:58 reads to decide its exit code.
+* **Returns:** {"test_output": "PR opened: "} — which main.py:118 reads to decide its exit code, after main.py:116 has logged the run summary built from `history`.

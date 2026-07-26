@@ -7,9 +7,12 @@
 
       docker run --rm --cap-add=SYS_ADMIN \
         -e RESOLV_GITHUB_TOKEN -e RESOLV_ANTHROPIC_API_KEY -e CLAUDE_CODE_OAUTH_TOKEN \
+        -v <host>/logs/<owner>__<repo>__issue-<n>:/workspace/logs \
         resolv-sandbox:latest run --repo owner/name --issue 123
 
   CLI users run that directly; the webhook server runs it per queued issue.
+  The container is --rm, so its log directory is bind-mounted back to the host —
+  one directory per issue, since log file names are per-minute and carry no run id.
   CodeRabbit is NOT a pipeline node — it reviews the pushed PR in the cloud afterwards.
 
   ┌────────────────────────────────────────────────────────────────────────────────────┐
@@ -66,3 +69,68 @@
                                             │
                                             ▼
                         [ CodeRabbit reviews the PR in the cloud ]
+
+
+========================================================================================
+                              STATE INSPECTION / OBSERVABILITY
+========================================================================================
+
+  Two independent ways to see what a run did: a live text trace, and a queryable
+  state history.
+
+  1. TEXT TRACE (utils/run_log.py -> stdout + logs/<DD-MM-YYYYTHH-MM>Z.log)
+
+     core/app.py:22  log_node_boundaries() wraps each node at the wiring layer, so
+                     the node modules themselves stay free of trace logging:
+
+                         [coder] enter iteration=1 test_status=FAILED diff_bytes=640 history=1
+                         [coder] exit wrote current_diff, iteration, test_status
+
+     core/graph.py:46  the gate logs which branch it chose — otherwise the loop /
+                       stall / deliver decision leaves no trace at all:
+
+                         [gate] loop (iteration 1/3, test FAILED)
+
+     main.py:47      render_run_summary() closes the run with the per-iteration
+                     audit trail held in state.history:
+
+                         [summary] 2 iteration(s), final status PASSED
+                           iteration 1: FAILED, diff 129 bytes
+
+     SIZES, NOT CONTENT. Diffs and pytest output are unbounded, and every history
+     record holds another copy of both, so the trace reports byte counts. `--verbose`
+     opts the summary in to the full content. This matters because the log is now
+     mounted onto the host rather than dying with the container.
+
+  2. STATE HISTORY (LangGraph checkpointer)
+
+     The checkpointer is SILENT — it prints nothing. It saves a complete copy of the
+     Blackboard after every super-step for code to query later. The text trace above
+     is what you read; this is what you query.
+
+     core/graph.py     sqlite_checkpointer() writes to logs/checkpoints.sqlite, which
+                       lands inside the bind-mounted per-issue directory. The database
+                       therefore OUTLIVES the --rm container, unlike an in-memory
+                       checkpointer whose history dies with the process. Tests get an
+                       ephemeral InMemorySaver by leaving `checkpointer` unset.
+
+                       Every call MUST pass a run config carrying a thread_id
+                       (main.py builds one as "owner/name#issue"):
+
+                         graph.get_state(config)          -> the committed state
+                         graph.get_state_history(config)  -> one snapshot per boundary
+
+                       Snapshots expose intermediate iterations the final state has
+                       already overwritten — e.g. the FAILED first attempt of a run
+                       that ultimately PASSED.
+
+     main.py           `resolv inspect --repo owner/name --issue N` reads that database
+                       back on the host. It compiles the same topology with PLACEHOLDER
+                       nodes purely to resolve which node each checkpoint sat before —
+                       the nodes are never executed, so no credentials are needed to
+                       inspect a finished run.
+
+     core/graph.py:37  the checkpoint serializer is pinned to an explicit allowlist of
+                       the Blackboard's own types. LangGraph's default permits any
+                       importable type with a warning; under its future default,
+                       unregistered types come back as plain dicts instead.
