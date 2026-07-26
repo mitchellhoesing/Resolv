@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock
 
 from pydantic import SecretStr
@@ -9,8 +10,9 @@ from pytest_mock import MockerFixture
 from typer.testing import CliRunner
 
 from resolv.config import Settings
-from resolv.core.state import IssueRef, IterationRecord
-from resolv.main import app, render_run_summary
+from resolv.core.graph import build_graph, sqlite_checkpointer
+from resolv.core.state import BlackboardState, IssueRef, IterationRecord
+from resolv.main import app, render_run_summary, render_state_history
 
 runner = CliRunner()
 
@@ -159,6 +161,74 @@ def test_cli_verbose_flag_expands_the_summary(mocker: MockerFixture) -> None:
     assert "    test output:" not in quiet.output
     assert "    test output:" in loud.output
     assert "      --- a/x" in loud.output
+
+
+def _write_checkpoint_database(destination: Path) -> None:
+    """Run a stub graph against a real database so `inspect` has something to read."""
+    from tests.integration._stub_nodes import (
+        stub_coder,
+        stub_context_broker,
+        stub_deliver,
+        stub_env_installer,
+        stub_test_runner,
+    )
+
+    graph = build_graph(
+        context_broker_fn=stub_context_broker,
+        env_installer_fn=stub_env_installer,
+        coder_fn=stub_coder,
+        test_runner_fn=stub_test_runner,
+        deliver_fn=stub_deliver,
+        checkpointer=sqlite_checkpointer(destination),
+    )
+    issue = IssueRef(owner="a", repo="b", number=1, title="t", body="", labels=())
+    graph.invoke(
+        BlackboardState(issue=issue, workspace_path=destination.parent),
+        config={"configurable": {"thread_id": "a/b#1"}},
+    )
+
+
+def test_cli_inspect_prints_the_state_history(tmp_path: Path) -> None:
+    database = tmp_path / "checkpoints.sqlite"
+    _write_checkpoint_database(database)
+
+    result = runner.invoke(
+        app,
+        ["inspect", "--repo", "a/b", "--issue", "1", "--database", str(database)],
+    )
+
+    assert result.exit_code == 0
+    assert "[history]" in result.output
+    # The executed path, including nodes the final state alone would not reveal.
+    for node_name in ("context_broker", "env_installer", "coder", "test_runner"):
+        assert f"before {node_name}" in result.output
+
+
+def test_cli_inspect_reports_a_missing_database(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "inspect",
+            "--repo", "a/b",
+            "--issue", "1",
+            "--database", str(tmp_path / "absent.sqlite"),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "no checkpoint database" in result.output
+
+
+def test_cli_inspect_without_a_database_names_both_paths_it_tried() -> None:
+    result = runner.invoke(app, ["inspect", "--repo", "a/b", "--issue", "1"])
+
+    assert result.exit_code == 1
+    assert "a__b__issue-1" in result.output
+    assert "checkpoints.sqlite" in result.output
+
+
+def test_render_state_history_handles_an_empty_database() -> None:
+    assert render_state_history([]) == "[history] no checkpoints recorded"
 
 
 def test_cli_dispatch_rejects_bad_repo_format() -> None:

@@ -11,17 +11,22 @@ Node functions are required arguments so tests can wire stubs and the
 production builder (`resolv.core.app.build_production_graph`) wires real
 implementations.
 
-The compiled graph carries an in-memory checkpointer, so every call must pass
-a run config containing a `thread_id` (see `resolv.main.thread_id_for`).
+The compiled graph is always checkpointed — on disk when a `checkpointer` is
+supplied, in memory otherwise — so every call must pass a run config containing
+a `thread_id` (see `resolv.main.thread_id_for`).
 """
 
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
+from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
@@ -37,6 +42,24 @@ NodeFn = Callable[[BlackboardState], dict[str, Any]]
 _CHECKPOINT_SERDE = JsonPlusSerializer(
     allowed_msgpack_modules=[BlackboardState, IssueRef, IterationRecord]
 )
+
+
+def sqlite_checkpointer(database_path: Path) -> SqliteSaver:
+    """Durable checkpointer whose database outlives the process that wrote it.
+
+    Production points this inside the mounted log directory, so a finished
+    container's state history stays queryable from the host. The connection is
+    left open for the life of the process, which for a per-issue container is
+    the life of the run.
+    """
+    database_path.parent.mkdir(parents=True, exist_ok=True)
+    # check_same_thread=False: LangGraph may touch the connection from its own
+    # worker threads, and the run owns the database exclusively either way.
+    connection = sqlite3.connect(str(database_path), check_same_thread=False)
+    checkpointer = SqliteSaver(connection, serde=_CHECKPOINT_SERDE)
+    checkpointer.setup()
+    return checkpointer
+
 
 GATE_DELIVER = "deliver"
 GATE_LOOP = "loop"
@@ -68,6 +91,7 @@ def build_graph(
     test_runner_fn: NodeFn,
     deliver_fn: NodeFn,
     max_iterations: int = 3,
+    checkpointer: BaseCheckpointSaver[Any] | None = None,
 ) -> CompiledStateGraph:
     graph: StateGraph = StateGraph(BlackboardState)
 
@@ -98,4 +122,7 @@ def build_graph(
     # The checkpointer snapshots the Blackboard after every super-step, which is
     # what makes `get_state` / `get_state_history` available for inspection.
     # Callers must supply a `thread_id` in their run config.
-    return graph.compile(checkpointer=InMemorySaver(serde=_CHECKPOINT_SERDE))
+    # Default is ephemeral: only production wants a database on disk.
+    return graph.compile(
+        checkpointer=checkpointer or InMemorySaver(serde=_CHECKPOINT_SERDE)
+    )

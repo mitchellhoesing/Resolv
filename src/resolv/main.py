@@ -13,12 +13,18 @@ from typing import Any
 
 import typer
 from langchain_core.runnables import RunnableConfig
+from langgraph.types import StateSnapshot
 
 from resolv.adapters.github_client import GitHubClient
 from resolv.config import get_settings
-from resolv.core.app import build_production_graph
+from resolv.core.app import (
+    CHECKPOINT_DATABASE_NAME,
+    build_production_graph,
+    checkpoint_database_path,
+)
+from resolv.core.graph import build_graph, sqlite_checkpointer
 from resolv.core.state import BlackboardState, IterationRecord
-from resolv.dispatch import dispatch_issue
+from resolv.dispatch import dispatch_issue, host_log_directory
 from resolv.exceptions import ResolvError
 from resolv.utils.run_log import log_event
 
@@ -124,6 +130,85 @@ def run(
         err=True,
     )
     raise typer.Exit(1)
+
+
+def render_state_history(snapshots: list[StateSnapshot]) -> str:
+    """Render one line per node boundary, oldest first.
+
+    Each snapshot's `next` names the node that was about to run, so the sequence
+    traces the executed path — including iterations the final state overwrote.
+    """
+    if not snapshots:
+        return "[history] no checkpoints recorded"
+    lines = [f"[history] {len(snapshots)} checkpoint(s)"]
+    for snapshot in snapshots:
+        next_node = snapshot.next[0] if snapshot.next else "(end)"
+        values = snapshot.values
+        lines.append(
+            f"  before {next_node:<15} "
+            f"iteration={values.get('iteration', 0)} "
+            f"test_status={str(values.get('test_status', '-')):<8} "
+            f"history={len(values.get('history') or [])}"
+        )
+    return "\n".join(lines)
+
+
+def _locate_checkpoint_database(owner: str, name: str, issue: int) -> Path:
+    """Find a finished run's database: dispatched layout first, then a local run."""
+    dispatched = host_log_directory(owner, name, issue) / CHECKPOINT_DATABASE_NAME
+    if dispatched.is_file():
+        return dispatched
+    local = checkpoint_database_path()
+    if local.is_file():
+        return local
+    typer.echo(
+        f"error: no checkpoint database at {dispatched} or {local}",
+        err=True,
+    )
+    raise typer.Exit(1)
+
+
+def _read_state_history(database: Path, thread_id: str) -> list[StateSnapshot]:
+    """Read a finished run's history without needing the real nodes or any secrets.
+
+    Only the graph topology matters for resolving which node each checkpoint sat
+    before, so the placeholder nodes below are compiled but never executed.
+    """
+
+    def placeholder(state: BlackboardState) -> dict[str, Any]:
+        raise AssertionError("placeholder node must never run")
+
+    graph = build_graph(
+        context_broker_fn=placeholder,
+        env_installer_fn=placeholder,
+        coder_fn=placeholder,
+        test_runner_fn=placeholder,
+        deliver_fn=placeholder,
+        checkpointer=sqlite_checkpointer(database),
+    )
+    config: RunnableConfig = {"configurable": {"thread_id": thread_id}}
+    return list(reversed(list(graph.get_state_history(config))))
+
+
+@app.command()
+def inspect(
+    repo: str = typer.Option(..., "--repo", help="Target repository as owner/name."),
+    issue: int = typer.Option(..., "--issue", help="Issue number of the finished run."),
+    database: Path = typer.Option(
+        None,
+        "--database",
+        help="Checkpoint database to read; defaults to the run's log directory.",
+    ),
+) -> None:
+    """Print the node-by-node state history of a run that has already finished."""
+    owner, name = _split_repo(repo)
+    resolved = database or _locate_checkpoint_database(owner, name, issue)
+    if not resolved.is_file():
+        typer.echo(f"error: no checkpoint database at {resolved}", err=True)
+        raise typer.Exit(1)
+
+    snapshots = _read_state_history(resolved, thread_id_for(owner, name, issue))
+    typer.echo(render_state_history(snapshots))
 
 
 @app.command()

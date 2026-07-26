@@ -5,11 +5,16 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import pytest
+from langgraph.checkpoint.sqlite import SqliteSaver
 from pydantic import SecretStr
 from pytest_mock import MockerFixture
 
 from resolv.config import Settings
-from resolv.core.app import build_production_graph, log_node_boundaries
+from resolv.core.app import (
+    build_production_graph,
+    checkpoint_database_path,
+    log_node_boundaries,
+)
 from resolv.core.state import BlackboardState
 
 
@@ -38,8 +43,12 @@ def test_build_production_graph_wires_all_nodes(mocker: MockerFixture) -> None:
         "test_runner_fn",
         "deliver_fn",
         "max_iterations",
+        "checkpointer",
     }
     assert kwargs["max_iterations"] == settings.loop.max_iterations
+    # Production checkpoints to disk so a finished run stays queryable.
+    assert isinstance(kwargs["checkpointer"], SqliteSaver)
+    assert checkpoint_database_path().is_file()
     for key in (
         "context_broker_fn",
         "env_installer_fn",

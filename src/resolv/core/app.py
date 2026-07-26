@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from langgraph.graph.state import CompiledStateGraph
@@ -9,14 +10,21 @@ from langgraph.graph.state import CompiledStateGraph
 from resolv.adapters.claude_code_client import ClaudeCodeBackend, ClaudeCodeClient
 from resolv.adapters.github_client import GitHubClient
 from resolv.config import Settings, get_settings
-from resolv.core.graph import NodeFn, build_graph
+from resolv.core.graph import NodeFn, build_graph, sqlite_checkpointer
 from resolv.core.state import BlackboardState
 from resolv.nodes.coder import make_coder_node
 from resolv.nodes.context_broker import make_context_broker_node
 from resolv.nodes.deliver import make_deliver_node
 from resolv.nodes.env_installer import make_env_installer_node
 from resolv.nodes.test_runner import make_test_runner_node
-from resolv.utils.run_log import log_event
+from resolv.utils.run_log import log_directory, log_event
+
+CHECKPOINT_DATABASE_NAME = "checkpoints.sqlite"
+
+
+def checkpoint_database_path() -> Path:
+    """Where a run's state history is written, alongside its log files."""
+    return log_directory() / CHECKPOINT_DATABASE_NAME
 
 
 def log_node_boundaries(node_name: str, node_fn: NodeFn) -> NodeFn:
@@ -70,4 +78,5 @@ def build_production_graph(settings: Settings | None = None) -> CompiledStateGra
             ),
         ),
         max_iterations=settings.loop.max_iterations,
+        checkpointer=sqlite_checkpointer(checkpoint_database_path()),
     )

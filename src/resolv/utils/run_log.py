@@ -8,6 +8,16 @@ from pathlib import Path
 _LOG_DIRECTORY = Path("logs")
 
 
+def log_directory() -> Path:
+    """Directory holding this run's log files and its checkpoint database.
+
+    Relative to the cwd: inside the container that resolves to /workspace/logs,
+    which `resolv dispatch` bind-mounts to the host so both outlive the `--rm`
+    container.
+    """
+    return _LOG_DIRECTORY
+
+
 def log_event(message: str) -> None:
     """Echo a UTC time-stamped message to stdout and append it to a per-minute UTC log file.
 

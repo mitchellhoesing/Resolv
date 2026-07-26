@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 from pytest_mock import MockerFixture
 
-from resolv.core.graph import build_graph
+from resolv.core.graph import build_graph, sqlite_checkpointer
 from resolv.core.state import BlackboardState, IssueRef, IterationRecord
 from tests.integration._stub_nodes import (
     stub_coder,
@@ -100,6 +100,42 @@ def test_loop_recovers_after_initial_failures(initial_state: BlackboardState) ->
     assert final["test_status"] == "PASSED"
     assert final["iteration"] == 2
     assert call_log == [1, 2]
+
+
+def test_sqlite_checkpointer_outlives_the_graph_that_wrote_it(
+    initial_state: BlackboardState, tmp_path: Path
+) -> None:
+    """A finished run must stay queryable without the original graph object."""
+    database = tmp_path / "checkpoints.sqlite"
+    config = _config()
+
+    writer = build_graph(
+        max_iterations=5,
+        checkpointer=sqlite_checkpointer(database),
+        **_default_wiring(),
+    )
+    writer.invoke(initial_state, config=config)
+    del writer
+
+    # A different graph, built from scratch against the same database.
+    reader = build_graph(
+        max_iterations=5,
+        checkpointer=sqlite_checkpointer(database),
+        **_default_wiring(),
+    )
+    snapshots = list(reversed(list(reader.get_state_history(config))))
+
+    assert [s.next[0] for s in snapshots if s.next and s.next[0] != "__start__"] == [
+        "context_broker",
+        "env_installer",
+        "coder",
+        "test_runner",
+        "deliver",
+    ]
+    # Custom types survive the database round-trip, not just plain fields.
+    final_values = snapshots[-1].values
+    assert isinstance(final_values["issue"], IssueRef)
+    assert isinstance(final_values["history"][0], IterationRecord)
 
 
 def test_gate_logs_each_routing_decision(
