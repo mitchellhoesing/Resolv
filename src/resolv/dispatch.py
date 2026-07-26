@@ -25,6 +25,7 @@ def build_dispatch_command(
         "docker", "run", "--rm", "--cap-add=SYS_ADMIN",
         "-e", "RESOLV_GITHUB_TOKEN",
         "-e", "RESOLV_ANTHROPIC_API_KEY",
+        "-e", "CLAUDE_CODE_OAUTH_TOKEN",
         settings.sandbox.image_tag,
         "run", "--repo", f"{owner}/{repo}", "--issue", str(number),
     ]
@@ -37,6 +38,7 @@ def dispatch_issue(settings: Settings, owner: str, repo: str, number: int) -> in
         **os.environ,
         "RESOLV_GITHUB_TOKEN": settings.github_token.get_secret_value(),
         "RESOLV_ANTHROPIC_API_KEY": settings.anthropic_api_key.get_secret_value(),
+        "CLAUDE_CODE_OAUTH_TOKEN": settings.claude_code_oauth_token.get_secret_value(),
     }
     completed = subprocess.run(command, env=env, check=False)
     return completed.returncode

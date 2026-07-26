@@ -8,8 +8,9 @@ only job is ingestion: clone the repository on first entry.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from git import GitCommandError, Repo
 from pydantic import SecretStr

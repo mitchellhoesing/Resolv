@@ -1,18 +1,18 @@
 ========================================================================================
-                          RESOLV PIPELINE - SYSTEM CONTROL FLOW TOPOLOGY
+                     RESOLV PIPELINE - SYSTEM CONTROL FLOW TOPOLOGY
 ========================================================================================
 
   The entire pipeline runs INSIDE one disposable per-issue Docker container. The host
   only launches it:
 
       docker run --rm --cap-add=SYS_ADMIN \
-        -e RESOLV_GITHUB_TOKEN -e RESOLV_ANTHROPIC_API_KEY \
+        -e RESOLV_GITHUB_TOKEN -e RESOLV_ANTHROPIC_API_KEY -e CLAUDE_CODE_OAUTH_TOKEN \
         resolv-sandbox:latest run --repo owner/name --issue 123
 
   CLI users run that directly; the webhook server runs it per queued issue.
   CodeRabbit is NOT a pipeline node — it reviews the pushed PR in the cloud afterwards.
 
-  ┌──────────────────────────────────────────────────────────────────────────────────┐
+  ┌────────────────────────────────────────────────────────────────────────────────────┐
   │                        DISPOSABLE PER-ISSUE CONTAINER                              │
   │                                                                                    │
   │   [ CLI `resolv run` / Webhook-dispatched ]                                        │
@@ -41,13 +41,13 @@
   │              │      └─► install repo deps into a SIBLING venv    │     │           │
   │              │          (pip / poetry / uv / pipenv)             │     │           │
   │              │                                                   │     │           │
-  │              ├──► [ Node 3: Coder ] ──────────────────────────────┘     │           │
-  │              │      │ (mutates the workspace in place)                  │           │
-  │              │      └─► Claude Agent SDK (agentic explore + edit)        │           │
-  │              │                                                          │           │
-  │              └──► [ Node 4: Test Runner ] ───────────────────────────────┘           │
-  │                     │ detect pytest / tox / unittest, then run it as an             │
-  │                     │ UNTRUSTED child: `unshare --net` (dead network) +             │
+  │              ├──► [ Node 3: Coder ] ─────────────────────────────┘     │           │
+  │              │      │ (mutates the workspace in place)                 │           │
+  │              │      └─► Claude Agent SDK (agentic explore + edit)      │           │
+  │              │                                                         │           │
+  │              └──► [ Node 4: Test Runner ] ─────────────────────────────┘           │
+  │                     │ detect pytest / tox / unittest, then run it as an            │
+  │                     │ UNTRUSTED child: `unshare --net` (dead network) +            │
   │                     │ explicitly scrubbed env (no secrets) + venv-first            │
   │                     │ PATH when the installer made one. CAP_SYS_ADMIN required.    │
   │                                                                                    │
@@ -55,14 +55,14 @@
   │              │                                                                     │
   │              ▼                                                                     │
   │     [ Gate: test_status ]                                                          │
-  │              ├──► FAILED  ─► increment iteration ─► loop back to Coder (w/ feedback)│
+  │              ├──► FAILED  ─► increment iteration ─► loop back to Coder (w/feedback)│
   │              │               * abort + LoopStallError if iterations >= max (5)     │
   │              │                                                                     │
-  │              └──► PASSED  ─► [ Node 5: Deliver ]                                    │
+  │              └──► PASSED  ─► [ Node 5: Deliver ]                                   │
   │                                │ branch + commit (GitPython)                       │
   │                                └─► push + open PR (PyGithub) ──► GitHub            │
   │                                                                                    │
-  └──────────────────────────────────────────────────────────────────────────────────┘
-                                       │
-                                       ▼
-                          [ CodeRabbit reviews the PR in the cloud ]
+  └────────────────────────────────────────────────────────────────────────────────────┘
+                                            │
+                                            ▼
+                        [ CodeRabbit reviews the PR in the cloud ]

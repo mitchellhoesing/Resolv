@@ -11,7 +11,7 @@ python -m venv venv
 pip install -e ".[dev]"
 ```
 
-Copy `.env.example` to `.env` and fill in `GITHUB_TOKEN`, `ANTHROPIC_API_KEY`, and `GITHUB_WEBHOOK_SECRET`.
+Copy `.env.example` to `.env` and fill in `RESOLV_GITHUB_TOKEN`, `RESOLV_GITHUB_WEBHOOK_SECRET`, and one of the two Claude credentials: `RESOLV_ANTHROPIC_API_KEY` (API billing) or `CLAUDE_CODE_OAUTH_TOKEN` (subscription auth from `claude setup-token`).
 
 ## Run
 
