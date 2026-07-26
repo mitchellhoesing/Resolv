@@ -2,7 +2,7 @@
 Resolv is an autonomous, stateful AI assistant designed to ingest git repository issues, locate code defects, and generate verified, production-grade Pull Requests.
 
 ## Repository structure
-resolv-pipeline/
+Resolv/
 ├── .claude/
 │   └── claude.md                  # Project overview optimized for LLM development tools
 ├── .github/
@@ -20,11 +20,11 @@ resolv-pipeline/
 ├── src/
 │   └── resolv/
 │       ├── __init__.py
-│       ├── main.py                # Typer CLI entrypoint (`resolv run` in-container, `resolv dispatch` host-side)
+│       ├── main.py                # Typer CLI entrypoint (`resolv run` in-container, `resolv dispatch`/`resolv inspect` host-side)
 │       ├── webhook.py             # FastAPI GitHub webhook listener; launches a per-issue container per event
 │       ├── dispatch.py            # Host-side per-issue `docker run` launcher shared by webhook and CLI
 │       ├── config.py              # Configuration loading via Pydantic Settings
-│       ├── exceptions.py          # Centralized custom exceptions (e.g., LoopStallError)
+│       ├── exceptions.py          # Centralized custom exceptions (e.g., IngestionError, SandboxError)
 │       │
 │       ├── adapters/              # External interface boundaries
 │       │   ├── __init__.py
@@ -35,7 +35,7 @@ resolv-pipeline/
 │       ├── core/                  # Orchestration and State Control
 │       │   ├── __init__.py
 │       │   ├── app.py             # Production wiring: Settings → compiled LangGraph application
-│       │   ├── graph.py           # LangGraph workflow instantiation and edge compilation
+│       │   ├── graph.py           # LangGraph workflow instantiation, edge compilation, checkpointer
 │       │   └── state.py           # Strongly typed Pydantic V2 state definitions (Blackboard)
 │       │
 │       ├── nodes/                 # LangGraph Worker Nodes
@@ -48,6 +48,7 @@ resolv-pipeline/
 │       │
 │       └── utils/                 # Shared helper modules
 │           ├── __init__.py
+│           ├── run_log.py         # Shared run log: stdout echo + per-minute UTC files under logs/
 │           └── sandbox.py         # Scrubbed-env subprocess spawning: `unshare --net` for tests, networked for installs
 │
 ├── tests/                         # Multi-tier testing suite
@@ -62,6 +63,7 @@ resolv-pipeline/
 │
 ├── .coderabbit.yaml               # CodeRabbit cloud-review configuration (read from repo root)
 ├── .dockerignore
+├── .env.example                   # Template for the env-only secrets; copy to .env
 ├── .gitignore
 ├── LICENSE
 ├── README.md                      # Human-facing project manual

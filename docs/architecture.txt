@@ -10,7 +10,8 @@
         -v <host>/logs/<owner>__<repo>__issue-<n>:/workspace/logs \
         resolv-sandbox:latest run --repo owner/name --issue 123
 
-  CLI users run that directly; the webhook server runs it per queued issue.
+  `resolv dispatch --repo owner/name --issue 123` builds and runs exactly that command
+  from the host; the webhook server runs the same thing per queued issue.
   The container is --rm, so its log directory is bind-mounted back to the host —
   one directory per issue, since log file names are per-minute and carry no run id.
   CodeRabbit is NOT a pipeline node — it reviews the pushed PR in the cloud afterwards.
@@ -22,13 +23,13 @@
   │              │                                                                     │
   │              ▼                                                                     │
   │   ┌───────────────────────┐                                                        │
-  │   │     src/main.py       │ ──( Initializes State )──► [ Pydantic Blackboard ]     │
+  │   │        main.py        │ ──( Initializes State )──► [ Pydantic Blackboard ]     │
   │   │   Execution Ingress   │                                ▲     ▲     ▲           │
   │   └───────────────────────┘                                │     │     │           │
   │              │                                             │     │     │           │
   │              ▼                                             │     │     │           │
   │   ┌───────────────────────┐                                │     │     │           │
-  │   │   src/core/graph.py   │                                │     │     │           │
+  │   │     core/graph.py     │                                │     │     │           │
   │   │   LangGraph Engine    │                                │     │     │           │
   │   └───────────────────────┘                                │     │     │           │
   │              │                                             │     │     │           │
@@ -59,7 +60,7 @@
   │              ▼                                                                     │
   │     [ Gate: test_status ]                                                          │
   │              ├──► FAILED  ─► increment iteration ─► loop back to Coder (w/feedback)│
-  │              │               * abort + LoopStallError if iterations >= max (5)     │
+  │              │               * stop at END if iterations >= max (default 3)        │
   │              │                                                                     │
   │              └──► PASSED  ─► [ Node 5: Deliver ]                                   │
   │                                │ branch + commit (GitPython)                       │
@@ -80,18 +81,18 @@
 
   1. TEXT TRACE (utils/run_log.py -> stdout + logs/<DD-MM-YYYYTHH-MM>Z.log)
 
-     core/app.py:22  log_node_boundaries() wraps each node at the wiring layer, so
+     core/app.py     log_node_boundaries() wraps each node at the wiring layer, so
                      the node modules themselves stay free of trace logging:
 
                          [coder] enter iteration=1 test_status=FAILED diff_bytes=640 history=1
-                         [coder] exit wrote current_diff, iteration, test_status
+                         [coder] exit wrote current_diff, iteration, test_output, test_status
 
-     core/graph.py:46  the gate logs which branch it chose — otherwise the loop /
+     core/graph.py     the gate logs which branch it chose — otherwise the loop /
                        stall / deliver decision leaves no trace at all:
 
                          [gate] loop (iteration 1/3, test FAILED)
 
-     main.py:47      render_run_summary() closes the run with the per-iteration
+     main.py         render_run_summary() closes the run with the per-iteration
                      audit trail held in state.history:
 
                          [summary] 2 iteration(s), final status PASSED
@@ -130,7 +131,7 @@
                        the nodes are never executed, so no credentials are needed to
                        inspect a finished run.
 
-     core/graph.py:37  the checkpoint serializer is pinned to an explicit allowlist of
+     core/graph.py     the checkpoint serializer is pinned to an explicit allowlist of
                        the Blackboard's own types. LangGraph's default permits any
                        importable type with a warning; under its future default,
                        unregistered types come back as plain dicts instead.

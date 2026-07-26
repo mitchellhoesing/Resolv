@@ -5,7 +5,7 @@ The graph wires:
     START -> context_broker -> env_installer -> coder -> test_runner -> gate
     gate -> deliver -> END                          (tests PASSED)
     gate -> coder                                   (loop with feedback, iteration < max)
-    gate -> END                                     (stall — LoopStallError logged by caller)
+    gate -> END                                     (stall — caller reports non-convergence)
 
 Node functions are required arguments so tests can wire stubs and the
 production builder (`resolv.core.app.build_production_graph`) wires real

@@ -1,10 +1,10 @@
-Every node below is wrapped by `log_node_boundaries` (core/app.py:22) at the production wiring layer, so each one logs the state it received and the keys it returned without the node modules carrying any trace code of their own. The `Returns:` dicts documented here are exactly what shows up in those `exit wrote ...` lines.
+Every node below is wrapped by `log_node_boundaries` (core/app.py) at the production wiring layer, so each one logs the state it received and the keys it returned without the node modules carrying any trace code of their own. The `Returns:` dicts documented here are exactly what shows up in those `exit wrote ...` lines.
 
 ---
 
 * **Node 1 — Context Broker (nodes/context_broker.py)**
 * **Job:** ensure the target repo is present in the workspace.
-* **1.** Clone if needed — if workspace/.git is absent, _clone does an authenticated https://@[github.com/](https://github.com/)... clone via GitPython. Failures become IngestionError.
+* **1.** Clone if needed — if `workspace/.git` is absent, `_clone` does an authenticated `https://<token>@github.com/<owner>/<repo>.git` clone via GitPython. Failures become `IngestionError`.
 * Snippet extraction (tree-sitter name matching + git-blame provenance) was removed in the v2 simplification; the agentic coder explores the workspace itself.
 * **Returns:** {} (no state updates).
 
@@ -24,33 +24,33 @@ Every node below is wrapped by `log_node_boundaries` (core/app.py:22) at the pro
 
 ---
 
-* **Node 3 — Coder (nodes/coder.py:16)**
+* **Node 3 — Coder (nodes/coder.py)**
 * **Job:** mutate the workspace in place to attempt a fix, then capture the diff.
-* **1.** Reset on retry (:17) — on iteration > 0, _reset_workspace runs git reset --hard + git clean -fdx, throwing away the previous failed attempt. Each attempt starts from a clean tree — attempts don't stack.
-* **2.** Compose feedback (_compose_feedback, :41) — on retries, builds a prompt block from history: every prior attempt's diff and (if FAILED) its test output, prefixed with "these failed, don't repeat them." This is how the loop learns.
-* **3.** Dispatch to the backend (:21) — calls backend.generate_patch(...). The backend is a Protocol (adapters/coder.py) implemented by ClaudeCodeBackend (Claude Agent SDK). The prompt is built by render_user_prompt, which lays out the issue and any prior feedback. The backend edits files directly; it returns nothing.
-* **4.** Capture the diff (_capture_diff, :69) — git diff HEAD.
+* **1.** Reset on retry — on iteration > 0, `_reset_workspace` runs `git reset --hard` + `git clean -fdx`, throwing away the previous failed attempt. Each attempt starts from a clean tree — attempts don't stack.
+* **2.** Compose feedback (`_compose_feedback`) — on retries, builds a prompt block from history: every prior attempt's diff (capped at 2000 chars) and (if FAILED) its test output, prefixed with "these failed, don't repeat them." This is how the loop learns.
+* **3.** Dispatch to the backend — calls `backend.generate_patch(...)`. The backend is a Protocol (adapters/coder.py) implemented by `ClaudeCodeBackend` (Claude Agent SDK). The prompt is built by `render_user_prompt`, which lays out the issue and any prior feedback. The backend edits files directly; it returns nothing.
+* **4.** Capture the diff (`_capture_diff`) — `git diff HEAD`.
 * **Returns:** {current_diff, iteration+1, test_status: "PENDING", test_output: None} — resetting status for the test runner.
 
 
 
 ---
 
-* **Node 4 — Test Runner (nodes/test_runner.py:46)**
+* **Node 4 — Test Runner (nodes/test_runner.py)**
 * **Job:** run the target repo's tests under isolation and judge pass/fail.
-* **1.** Detect the framework (detect_test_command, :14) — ordered: pyproject.toml with [tool.pytest.ini_options] → pytest.ini/conftest.py → tox.ini → a tests/ dir with test_*.py (unittest). No recognizable layout → None, which is recorded as a FAILED "no test runner detected" (:48).
-* **2.** Run isolated (:50) — delegates to run_isolated (sandbox.py). This is the security core: the untrusted test command is spawned under unshare --net (fresh network namespace, loopback up but no external route — can't exfiltrate) with a scrubbed env (*scrubbed_env — only PATH/HOME/LANG/LC_ALL/TERM; all secrets and RESOLV** dropped). When the env_installer created a venv, its bin dir is prepended to PATH (VIRTUAL_ENV set), so pytest/tox resolve to the target repo's venv with the image binaries as fallback. A timeout returns a failed result rather than raising, so the loop can feed it back. Missing unshare raises SandboxError. This needs --cap-add=SYS_ADMIN on the container. Known limitation: tox provisioning its own envs still needs network, which the netns denies.
-* **3.** Judge (:55) — exit code 0 → PASSED, else FAILED. Output is stdout+stderr tail-capped at 10k chars.
-* **4.** Record (_record_and_return, :62) — appends an IterationRecord to history.
+* **1.** Detect the framework (`detect_test_command`) — ordered: pyproject.toml with `[tool.pytest.ini_options]` → pytest.ini/conftest.py → tox.ini → a tests/ dir with `test_*.py` (unittest). No recognizable layout → None, which is recorded as a FAILED "no test runner detected".
+* **2.** Run isolated — delegates to `run_isolated` (sandbox.py). This is the security core: the untrusted test command is spawned under `unshare --net` (fresh network namespace, loopback up but no external route — can't exfiltrate) with a scrubbed env (`_scrubbed_env` — only PATH/HOME/LANG/LC_ALL/TERM; all secrets and `RESOLV_*` dropped). When the env_installer created a venv, its bin dir is prepended to PATH (VIRTUAL_ENV set), so pytest/tox resolve to the target repo's venv with the image binaries as fallback. A timeout returns a failed result rather than raising, so the loop can feed it back. Missing `unshare` raises `SandboxError`. This needs `--cap-add=SYS_ADMIN` on the container. Known limitation: tox provisioning its own envs still needs network, which the netns denies.
+* **3.** Judge — exit code 0 → PASSED, else FAILED. Output is stdout+stderr tail-capped at 10k chars, and the log line carries parsed passed/failed counts when the summary is recognizable (`_format_test_summary`).
+* **4.** Record (`_record_and_return`) — appends an `IterationRecord` to history.
 * **Returns:** {test_status, test_output, history}.
-* **Then the gate (core/graph.py:46) routes on the result:** PASSED → deliver; iteration >= max → END (stall); otherwise → back to coder with the new feedback. The chosen branch is logged as `[gate] loop|stall|deliver (iteration N/max, test STATUS)`.
+* **Then the gate (core/graph.py) routes on the result:** PASSED → deliver; iteration >= max → END (stall); otherwise → back to coder with the new feedback. The chosen branch is logged as `[gate] loop|stall|deliver (iteration N/max, test STATUS)`.
 
 
 
 ---
 
-* **Node 5 — Deliver (nodes/deliver.py:20)**
+* **Node 5 — Deliver (nodes/deliver.py)**
 * **Job:** ship the verified fix. Only reached when tests passed.
-* **1.** Branch + commit + push (:24) — via GitPython: create resolv/issue-, check out, add -A, commit fix: resolve issue # — , push to origin. Git failures → DeliveryError.
-* **2.** Open the PR (:35) — github_client.open_pull_request(...) against base_branch (default main), body Resolves # plus the issue text.
-* **Returns:** {"test_output": "PR opened: "} — which main.py:118 reads to decide its exit code, after main.py:116 has logged the run summary built from `history`.
+* **1.** Branch + commit + push — via GitPython: create `resolv/issue-<number>`, check out, `add -A`, commit `fix: resolve issue #<number> — <title>`, push to origin. Git failures → `DeliveryError`.
+* **2.** Open the PR — `github_client.open_pull_request(...)` against `base_branch` (default `main`), body `Resolves #<number>` plus the issue text.
+* **Returns:** `{"test_output": "PR opened: <url>"}` — which `main.py` reads to decide its exit code, after it has logged the run summary built from `history`.

@@ -26,8 +26,15 @@ class CoderError(ResolvError):
 
 
 class ConfigError(ResolvError):
-    """Raised when configuration is missing, invalid, or references an unknown option."""
+    """Configuration missing, invalid, or referencing an unknown option.
+
+    Currently unraised: pydantic-settings validates Settings on construction.
+    """
 
 
 class LoopStallError(ResolvError):
-    """Raised when the LangGraph loop exceeds max_iterations without converging."""
+    """The LangGraph loop exceeded max_iterations without converging.
+
+    Currently unraised: the gate routes a stalled loop to END, and `resolv run`
+    reports non-convergence with a message and a non-zero exit code instead.
+    """

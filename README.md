@@ -13,13 +13,39 @@ pip install -e ".[dev]"
 
 Copy `.env.example` to `.env` and fill in `RESOLV_GITHUB_TOKEN`, `RESOLV_GITHUB_WEBHOOK_SECRET`, and one of the two Claude credentials: `RESOLV_ANTHROPIC_API_KEY` (API billing) or `CLAUDE_CODE_OAUTH_TOKEN` (subscription auth from `claude setup-token`).
 
+Build the per-issue sandbox image that `resolv dispatch` and the webhook launch:
+
+```bash
+docker build -f .container/sandbox.Dockerfile -t resolv-sandbox:latest .
+```
+
+## Configuration
+
+Non-secret settings live in `config/settings.toml` — that file is the source of truth for
+the available keys and their defaults. Secrets are env-only and never appear in it.
+
+Any setting can be overridden by an environment variable named
+`RESOLV_<SECTION>__<KEY>` (double underscore separates the section from the key).
+Precedence, lowest to highest: `config/settings.toml` → `.env` → process environment →
+constructor kwargs.
+
+```bash
+RESOLV_LOOP__MAX_ITERATIONS=5 RESOLV_SANDBOX__TEST_TIMEOUT_SECONDS=900 resolv run ...
+```
+
 ## Run
 
 CLI (runs the pipeline in-process; this is what executes inside the sandbox container):
 ```bash
 resolv run --repo owner/name --issue 123
 resolv run --repo owner/name --issue 123 --verbose   # full diff + test output per iteration
+resolv run --repo owner/name --issue 123 --workspace-root ./workspaces   # default: /workspace
 ```
+
+`resolv run` expects the container's environment: the test runner isolates the target
+suite with `unshare --net`, which needs Linux and `--cap-add=SYS_ADMIN`. On any other
+host the run reaches `test_runner` and fails there with a `SandboxError`. Use
+`resolv dispatch` instead.
 
 Manually launch one disposable per-issue container from the host (same `docker run` the webhook uses):
 ```bash
@@ -91,6 +117,10 @@ as `owner/name#issue`).
 
 ## Test
 
+The three checks CI runs on every push and PR:
+
 ```bash
 pytest --cov=src --cov-report=term-missing
+ruff check src tests
+mypy src
 ```

@@ -8,9 +8,17 @@
 > and `QAGateError` no longer exist, and the gate converges on `test_status == PASSED`
 > alone. The nested-container `run_in_sandbox` is replaced by `utils/sandbox.py`, which
 > runs the untrusted test suite as an in-process child under `unshare --net` with a
-> scrubbed env (requires `--cap-add=SYS_ADMIN`). SCIP indexing was never built; the
-> broker is tree-sitter only (plus git-blame provenance). The sections below are
-> retained as historical context; where they conflict with this note, this note wins.
+> scrubbed env (requires `--cap-add=SYS_ADMIN`). **Context pruning was dropped entirely** —
+> neither SCIP indexing nor tree-sitter snippet extraction exists, so `scip_index_path`,
+> `pruned_context`, `ContextChunk`, and `utils/ast_tools.py` are gone; the broker only
+> clones, and the agentic coder explores the workspace itself. **The LiteLLM backend was
+> never built** — `ClaudeCodeBackend` (Claude Agent SDK) is the only implementation, so
+> there is no `coder.backend` setting and no `adapters/llm_inference.py`. Added since:
+> `nodes/env_installer.py` (installs the target repo's dev/test deps into a sibling venv),
+> `utils/run_log.py`, `dispatch.py` + `resolv dispatch`, and a SQLite checkpointer with
+> `resolv inspect` for replaying a finished run's state history. `loop.max_iterations`
+> defaults to **3**, not 5. The sections below are retained as historical context; where
+> they conflict with this note, this note wins.
 
 ## Context
 
