@@ -10,6 +10,9 @@ The graph wires:
 Node functions are required arguments so tests can wire stubs and the
 production builder (`resolv.core.app.build_production_graph`) wires real
 implementations.
+
+The compiled graph carries an in-memory checkpointer, so every call must pass
+a run config containing a `thread_id` (see `resolv.main.thread_id_for`).
 """
 
 from __future__ import annotations
@@ -17,6 +20,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
@@ -75,4 +79,7 @@ def build_graph(
     )
     graph.add_edge("deliver", END)
 
-    return graph.compile()
+    # The checkpointer snapshots the Blackboard after every super-step, which is
+    # what makes `get_state` / `get_state_history` available for inspection.
+    # Callers must supply a `thread_id` in their run config.
+    return graph.compile(checkpointer=InMemorySaver())

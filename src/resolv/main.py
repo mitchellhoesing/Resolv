@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 
 import typer
+from langchain_core.runnables import RunnableConfig
 
 from resolv.adapters.github_client import GitHubClient
 from resolv.config import get_settings
@@ -36,6 +37,11 @@ def _split_repo(repo: str) -> tuple[str, str]:
     return owner, name
 
 
+def thread_id_for(owner: str, name: str, issue: int) -> str:
+    """Build the checkpointer thread id identifying one issue's run."""
+    return f"{owner}/{name}#{issue}"
+
+
 @app.command()
 def run(
     repo: str = typer.Option(..., "--repo", help="Target repository as owner/name."),
@@ -57,8 +63,13 @@ def run(
     initial_state = BlackboardState(issue=issue_ref, workspace_path=workspace_path)
 
     graph = build_production_graph(settings)
+    # The compiled graph is checkpointed, so a thread id is mandatory; it also
+    # keys the state history for post-run inspection.
+    run_config: RunnableConfig = {
+        "configurable": {"thread_id": thread_id_for(owner, name, issue)}
+    }
     try:
-        final_state = graph.invoke(initial_state)
+        final_state = graph.invoke(initial_state, config=run_config)
     except ResolvError as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(1) from exc
