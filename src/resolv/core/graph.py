@@ -21,13 +21,22 @@ from collections.abc import Callable
 from typing import Any
 
 from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from resolv.core.state import BlackboardState
+from resolv.core.state import BlackboardState, IssueRef, IterationRecord
 from resolv.utils.run_log import log_event
 
 NodeFn = Callable[[BlackboardState], dict[str, Any]]
+
+# Register the Blackboard's own types with the checkpoint serializer. Without an
+# explicit allowlist LangGraph applies a permissive default that allows *any*
+# importable type and warns once per type per run; under its future default these
+# types deserialize to plain dicts instead of themselves.
+_CHECKPOINT_SERDE = JsonPlusSerializer(
+    allowed_msgpack_modules=[BlackboardState, IssueRef, IterationRecord]
+)
 
 GATE_DELIVER = "deliver"
 GATE_LOOP = "loop"
@@ -89,4 +98,4 @@ def build_graph(
     # The checkpointer snapshots the Blackboard after every super-step, which is
     # what makes `get_state` / `get_state_history` available for inspection.
     # Callers must supply a `thread_id` in their run config.
-    return graph.compile(checkpointer=InMemorySaver())
+    return graph.compile(checkpointer=InMemorySaver(serde=_CHECKPOINT_SERDE))
