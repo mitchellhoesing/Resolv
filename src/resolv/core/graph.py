@@ -25,6 +25,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from resolv.core.state import BlackboardState
+from resolv.utils.run_log import log_event
 
 NodeFn = Callable[[BlackboardState], dict[str, Any]]
 
@@ -36,10 +37,16 @@ GATE_STALL = "stall"
 def _make_gate_router(max_iterations: int) -> Callable[[BlackboardState], str]:
     def gate_router(state: BlackboardState) -> str:
         if state.test_status == "PASSED":
-            return GATE_DELIVER
-        if state.iteration >= max_iterations:
-            return GATE_STALL
-        return GATE_LOOP
+            decision = GATE_DELIVER
+        elif state.iteration >= max_iterations:
+            decision = GATE_STALL
+        else:
+            decision = GATE_LOOP
+        log_event(
+            f"[gate] {decision} (iteration {state.iteration}/{max_iterations}, "
+            f"test {state.test_status})"
+        )
+        return decision
 
     return gate_router
 

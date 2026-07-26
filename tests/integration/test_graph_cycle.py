@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from pytest_mock import MockerFixture
 
 from resolv.core.graph import build_graph
 from resolv.core.state import BlackboardState, IssueRef, IterationRecord
@@ -99,6 +100,38 @@ def test_loop_recovers_after_initial_failures(initial_state: BlackboardState) ->
     assert final["test_status"] == "PASSED"
     assert final["iteration"] == 2
     assert call_log == [1, 2]
+
+
+def test_gate_logs_each_routing_decision(
+    initial_state: BlackboardState, mocker: MockerFixture
+) -> None:
+    """The gate's branch is otherwise invisible — it must appear in the run log."""
+    log_mock = mocker.patch("resolv.core.graph.log_event")
+
+    def failing_tests(state: BlackboardState) -> dict[str, Any]:
+        return {"test_status": "FAILED", "test_output": "boom"}
+
+    app = build_graph(max_iterations=2, **_default_wiring(test_runner_fn=failing_tests))
+    app.invoke(initial_state, config=_config())
+
+    gate_messages = [call.args[0] for call in log_mock.call_args_list]
+    assert gate_messages == [
+        "[gate] loop (iteration 1/2, test FAILED)",
+        "[gate] stall (iteration 2/2, test FAILED)",
+    ]
+
+
+def test_gate_logs_the_deliver_decision(
+    initial_state: BlackboardState, mocker: MockerFixture
+) -> None:
+    log_mock = mocker.patch("resolv.core.graph.log_event")
+
+    app = build_graph(max_iterations=5, **_default_wiring())
+    app.invoke(initial_state, config=_config())
+
+    assert [call.args[0] for call in log_mock.call_args_list] == [
+        "[gate] deliver (iteration 1/5, test PASSED)"
+    ]
 
 
 def test_state_history_exposes_every_node_boundary(
