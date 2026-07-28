@@ -90,7 +90,7 @@ def build_graph(
     coder_fn: NodeFn,
     test_runner_fn: NodeFn,
     deliver_fn: NodeFn,
-    max_iterations: int = 3,
+    max_iterations: int,
     checkpointer: BaseCheckpointSaver[Any] | None = None,
 ) -> CompiledStateGraph:
     graph: StateGraph = StateGraph(BlackboardState)

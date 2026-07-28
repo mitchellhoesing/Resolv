@@ -179,6 +179,7 @@ def _write_checkpoint_database(destination: Path) -> None:
         coder_fn=stub_coder,
         test_runner_fn=stub_test_runner,
         deliver_fn=stub_deliver,
+        max_iterations=1,
         checkpointer=sqlite_checkpointer(destination),
     )
     issue = IssueRef(owner="a", repo="b", number=1, title="t", body="", labels=())
