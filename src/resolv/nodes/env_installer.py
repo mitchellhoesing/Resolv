@@ -137,7 +137,10 @@ def make_env_installer_node(
     installer_runner: Callable[..., Any] = run_networked,
 ) -> Callable[[BlackboardState], dict[str, Any]]:
     def env_installer_node(state: BlackboardState) -> dict[str, Any]:
-        log_event(f"[env_installer] installing {state.issue.repo} dev/test dependencies")
+        log_event(
+            f"[env_installer] installing {state.issue.owner}/{state.issue.repo} "
+            f"dev/test dependencies"
+        )
         workspace = state.workspace_path
         venv = venv_path_for(workspace)
 
