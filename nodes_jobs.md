@@ -1,4 +1,4 @@
-Every node below is wrapped by `log_node_boundaries` (core/app.py) at the production wiring layer, so each one logs the state it received and the keys it returned without the node modules carrying any trace code of their own. The `Returns:` dicts documented here are exactly what shows up in those `exit wrote ...` lines.
+Every node below is wrapped by `log_node_boundaries` (core/app.py) at the production wiring layer, which brackets the node with a `starting...` line and a `finished in Ns` line. Those are the only node-agnostic facts, so they are all the wrapper logs — what a node actually did (which repo, which command, what came out of it) each node logs itself, in terms that mean something for its own job. The `Returns:` dicts documented here are Blackboard plumbing and are deliberately *not* logged.
 
 ---
 
@@ -43,7 +43,7 @@ Every node below is wrapped by `log_node_boundaries` (core/app.py) at the produc
 * **3.** Judge — exit code 0 → PASSED, else FAILED. Output is stdout+stderr tail-capped at 10k chars, and the log line carries parsed passed/failed counts when the summary is recognizable (`_format_test_summary`).
 * **4.** Record (`_record_and_return`) — appends an `IterationRecord` to history.
 * **Returns:** {test_status, test_output, history}.
-* **Then the gate (core/graph.py) routes on the result:** PASSED → deliver; iteration >= max → END (stall); otherwise → back to coder with the new feedback. The chosen branch is logged as `[gate] loop|stall|deliver (iteration N/max, test STATUS)`.
+* **Then the gate (core/graph.py) routes on the result:** PASSED → deliver; iteration >= max → END (stall); otherwise → back to coder with the new feedback. The chosen branch is logged as `[test_runner] loop|stall|deliver (iteration N/max, test STATUS)`.
 
 
 

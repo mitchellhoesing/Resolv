@@ -89,7 +89,7 @@ def test_render_run_summary_reports_sizes_by_default() -> None:
     )
 
     assert summary.splitlines() == [
-        "[summary] 2 iteration(s), final status PASSED",
+        "[deliver] 2 iteration(s), final status PASSED",
         "  iteration 1: FAILED, diff 16 bytes",
         "  iteration 2: PASSED, diff 16 bytes",
     ]
@@ -112,7 +112,7 @@ def test_render_run_summary_includes_content_when_verbose() -> None:
 def test_render_run_summary_handles_a_run_with_no_iterations() -> None:
     summary = render_run_summary({"test_status": "FAILED"}, verbose=True)
 
-    assert summary == "[summary] 0 iteration(s), final status FAILED"
+    assert summary == "[deliver] 0 iteration(s), final status FAILED"
 
 
 def test_cli_prints_run_summary_on_the_stall_path(mocker: MockerFixture) -> None:
@@ -133,7 +133,7 @@ def test_cli_prints_run_summary_on_the_stall_path(mocker: MockerFixture) -> None
     result = runner.invoke(app, ["run", "--repo", "a/b", "--issue", "1"])
 
     assert result.exit_code == 1
-    assert "[summary] 2 iteration(s), final status FAILED" in result.output
+    assert "[deliver] 2 iteration(s), final status FAILED" in result.output
     assert "  iteration 1: FAILED, diff 16 bytes" in result.output
     assert "did not converge" in result.output
 

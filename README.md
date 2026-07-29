@@ -64,23 +64,29 @@ uvicorn --factory resolv.webhook:create_app --host 0.0.0.0 --port 8080
 
 ## Inspecting a run
 
-Every node logs the state it received and the keys it wrote, and the gate logs which
-branch it took. The lines go to stdout and to `logs/<DD-MM-YYYYTHH-MM>Z.log`:
+Each node is bracketed by a `starting...` / `finished in Ns` pair and reports what it
+did in its own terms; the gate logs which branch it took. The lines go to stdout and to
+`logs/<DD-MM-YYYYTHH-MM>Z.log`:
 
 ```
-[coder] enter iteration=1 test_status=FAILED diff_bytes=640 history=1
-[coder] exit wrote current_diff, iteration, test_output, test_status
-[test_runner] 3 passed, 1 failed — status FAILED
-[gate] loop (iteration 1/3, test FAILED)
+[coder] starting...
+[coder] iteration 2: discarding the workspace changes from iteration 1 and retrying with its test failures as feedback
+[coder] iteration 2: wrote a 640-byte diff across 3 file(s)
+[coder] finished in 74.1s
+[test_runner] starting...
+[test_runner] iteration 2: running pytest -q --tb=short
+[test_runner] iteration 2: 3 passed, 1 failed — suite FAILED
+[test_runner] finished in 6.2s
+[test_runner] loop (iteration 2/3, test FAILED)
 ```
 
-`diff_bytes` and the history count are sizes, not content — the diffs and test output
-themselves stay out of the log unless you pass `--verbose`.
+Diff and test-suite output are reported by size and counts, never inlined — the content
+itself stays out of the log unless you pass `--verbose`.
 
 A run ends with a summary of the per-iteration audit trail:
 
 ```
-[summary] 2 iteration(s), final status PASSED
+[deliver] 2 iteration(s), final status PASSED
   iteration 1: FAILED, diff 129 bytes
   iteration 2: PASSED, diff 150 bytes
 ```

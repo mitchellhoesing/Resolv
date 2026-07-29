@@ -120,7 +120,7 @@ def test_logs_per_test_counts_on_pass(state: BlackboardState, tmp_path: Path) ->
     )
     node = make_test_runner_node(timeout=60, sandbox_runner=runner)
     node(state)
-    assert "[test_runner] 3 passed, 0 failed — status PASSED" in _read_run_log(tmp_path)
+    assert "3 passed, 0 failed — suite PASSED" in _read_run_log(tmp_path)
 
 
 def test_logs_per_test_counts_on_fail(state: BlackboardState, tmp_path: Path) -> None:
@@ -130,7 +130,7 @@ def test_logs_per_test_counts_on_fail(state: BlackboardState, tmp_path: Path) ->
     )
     node = make_test_runner_node(timeout=60, sandbox_runner=runner)
     node(state)
-    assert "[test_runner] 1 passed, 2 failed — status FAILED" in _read_run_log(tmp_path)
+    assert "1 passed, 2 failed — suite FAILED" in _read_run_log(tmp_path)
 
 
 def test_logs_status_only_when_counts_unparseable(
@@ -142,13 +142,13 @@ def test_logs_status_only_when_counts_unparseable(
     )
     node = make_test_runner_node(timeout=60, sandbox_runner=runner)
     node(state)
-    assert "[test_runner] status FAILED" in _read_run_log(tmp_path)
+    assert "suite finished FAILED (no test counts in its output)" in _read_run_log(tmp_path)
 
 
 def test_logs_error_when_no_framework(state: BlackboardState, tmp_path: Path) -> None:
     node = make_test_runner_node(timeout=1, sandbox_runner=MagicMock())
     node(state)
-    assert "[test_runner] error: no test runner detected" in _read_run_log(tmp_path)
+    assert "no recognizable test layout to run" in _read_run_log(tmp_path)
 
 
 def test_sandbox_error_is_logged_and_reraised(

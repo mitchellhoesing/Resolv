@@ -16,9 +16,15 @@ def make_coder_node(
     backend: CoderBackend,
 ) -> Callable[[BlackboardState], dict[str, Any]]:
     def coder_node(state: BlackboardState) -> dict[str, Any]:
-        log_event(f"[coder] iteration {state.iteration + 1} started")
+        attempt = state.iteration + 1
         if state.iteration > 0:
+            log_event(
+                f"[coder] iteration {attempt}: discarding the workspace changes from "
+                f"iteration {state.iteration} and retrying with its test failures as feedback"
+            )
             _reset_workspace(state.workspace_path)
+        else:
+            log_event(f"[coder] iteration {attempt}: first attempt at issue #{state.issue.number}")
 
         prior_feedback = _compose_feedback(state)
         try:
@@ -31,9 +37,10 @@ def make_coder_node(
             log_event(f"[coder] error: {exc}")
             raise
         diff = _capture_diff(state.workspace_path)
+        log_event(f"[coder] iteration {attempt}: {_describe_diff(diff)}")
         return {
             "current_diff": diff,
-            "iteration": state.iteration + 1,
+            "iteration": attempt,
             "test_status": "PENDING",
             "test_output": None,
         }
@@ -42,6 +49,20 @@ def make_coder_node(
 
 
 _DIFF_CAP = 2000
+
+
+def _describe_diff(diff: str) -> str:
+    """Size and file count of what the backend left in the workspace, for the run log.
+
+    The diff's content stays out of the log — it is unbounded, and `--verbose`
+    on the run summary is the opt-in for seeing it.
+    """
+    if not diff:
+        return "the backend left the workspace unchanged"
+    changed_file_count = sum(
+        1 for line in diff.splitlines() if line.startswith("diff --git ")
+    )
+    return f"wrote a {len(diff)}-byte diff across {changed_file_count} file(s)"
 
 
 def _compose_feedback(state: BlackboardState) -> str | None:

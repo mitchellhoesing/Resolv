@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from typing import Any
 
@@ -28,17 +29,20 @@ def checkpoint_database_path() -> Path:
 
 
 def log_node_boundaries(node_name: str, node_fn: NodeFn) -> NodeFn:
-    """Wrap a node so the run log records the state it received and the keys it wrote.
+    """Wrap a node so the run log brackets it with a start line and how long it took.
 
-    Wrapping at the wiring layer keeps the node modules themselves untouched and
-    leaves stub-wired test graphs free of logging.
+    Which node is running and how long it ran are the only facts equally relevant
+    to every node, so they are all this wrapper reports: what a node did — which
+    repo, which command, what came out of it — is logged by the node itself,
+    where that meaning lives. A node that raises logs its own error and gets no
+    closing line.
     """
 
     def logged_node(state: BlackboardState) -> dict[str, Any]:
-        log_event(f"[{node_name}] enter {state.summary()}")
+        log_event(f"[{node_name}] starting...")
+        started_at = time.monotonic()
         update = node_fn(state)
-        written_keys = ", ".join(sorted(update)) if update else "(no changes)"
-        log_event(f"[{node_name}] exit wrote {written_keys}")
+        log_event(f"[{node_name}] finished in {time.monotonic() - started_at:.1f}s")
         return update
 
     return logged_node

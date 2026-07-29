@@ -79,9 +79,9 @@ def test_generate_patch_logs_token_usage_not_prompt(
         log_file.read_text(encoding="utf-8")
         for log_file in (tmp_path / "logs").glob("*.log")
     )
-    assert f"[coder-agent] turn usage={turn_usage} tools=['Read']" in log_contents
+    assert f"[coder] turn usage={turn_usage} tools=['Read']" in log_contents
     assert (
-        f"[coder-agent] run complete: turns=2 cost_usd=0.05 usage={run_usage}"
+        f"[coder] run complete: turns=2 cost_usd=0.05 usage={run_usage}"
         in log_contents
     )
     assert "repro steps" not in log_contents

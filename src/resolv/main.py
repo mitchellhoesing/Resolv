@@ -58,7 +58,7 @@ def render_run_summary(final_state: dict[str, Any], verbose: bool) -> str:
     """
     history: list[IterationRecord] = final_state.get("history") or []
     lines = [
-        f"[summary] {len(history)} iteration(s), "
+        f"[deliver] {len(history)} iteration(s), "
         f"final status {final_state.get('test_status')}"
     ]
     for record in history:

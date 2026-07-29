@@ -50,9 +50,14 @@ def make_test_runner_node(
     def test_runner_node(state: BlackboardState) -> dict[str, Any]:
         command = detect_test_command(state.workspace_path)
         if command is None:
-            log_event("[test_runner] error: no test runner detected")
+            log_event(
+                f"[test_runner] iteration {state.iteration}: error: the workspace has "
+                f"no recognizable test layout to run"
+            )
             return _record_and_return(state, "FAILED", "no test runner detected")
-        log_event(f"[test_runner] running: {' '.join(command)}")
+        log_event(
+            f"[test_runner] iteration {state.iteration}: running {' '.join(command)}"
+        )
         # Prefer the per-repo venv's binaries when the env_installer created one;
         # image binaries remain as PATH fallback.
         venv = venv_path_for(state.workspace_path)
@@ -68,19 +73,20 @@ def make_test_runner_node(
             raise
         status = "PASSED" if result.exit_code == 0 else "FAILED"
         combined = (result.stdout + result.stderr)[-_OUTPUT_TAIL_CHARS:]
-        log_event(_format_test_summary(combined, status))
+        log_event(_format_test_summary(combined, status, state.iteration))
         return _record_and_return(state, status, combined)
 
     return test_runner_node
 
 
-def _format_test_summary(output: str, status: str) -> str:
+def _format_test_summary(output: str, status: str, iteration: int) -> str:
     """Compose the log entry for a test run, with per-test counts when parseable."""
+    prefix = f"[test_runner] iteration {iteration}:"
     counts = _parse_test_counts(output)
     if counts is None:
-        return f"[test_runner] status {status}"
+        return f"{prefix} suite finished {status} (no test counts in its output)"
     passed_count, failed_count = counts
-    return f"[test_runner] {passed_count} passed, {failed_count} failed — status {status}"
+    return f"{prefix} {passed_count} passed, {failed_count} failed — suite {status}"
 
 
 def _parse_test_counts(output: str) -> tuple[int, int] | None:

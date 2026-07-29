@@ -22,7 +22,10 @@ def make_deliver_node(
     def deliver_node(state: BlackboardState) -> dict[str, Any]:
         branch_name = f"{branch_prefix}{state.issue.number}"
         commit_message = f"fix: resolve issue #{state.issue.number} — {state.issue.title}"
-        log_event(f"[deliver] pushing branch {branch_name} for issue #{state.issue.number}")
+        log_event(
+            f"[deliver] committing the passing patch to {branch_name} and pushing it "
+            f"to {state.issue.owner}/{state.issue.repo}"
+        )
         try:
             repo = Repo(str(state.workspace_path))
             branch = repo.create_head(branch_name)
@@ -51,9 +54,8 @@ def make_deliver_node(
             log_event(f"[deliver] error: {exc}")
             raise
         log_event(
-            f"[deliver] repo={state.issue.owner}/{state.issue.repo} "
-            f'branch={branch_name} commit="{commit_message}" '
-            f"issue=#{state.issue.number} pr={pr_url}"
+            f"[deliver] opened PR {pr_url} from {branch_name} into {base_branch}, "
+            f"resolving issue #{state.issue.number}"
         )
         return {"test_output": f"PR opened: {pr_url}"}
 

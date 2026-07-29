@@ -75,7 +75,7 @@ def _make_gate_router(max_iterations: int) -> Callable[[BlackboardState], str]:
         else:
             decision = GATE_LOOP
         log_event(
-            f"[gate] {decision} (iteration {state.iteration}/{max_iterations}, "
+            f"[test_runner] {decision} (iteration {state.iteration}/{max_iterations}, "
             f"test {state.test_status})"
         )
         return decision

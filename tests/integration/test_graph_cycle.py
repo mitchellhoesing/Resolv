@@ -152,8 +152,8 @@ def test_gate_logs_each_routing_decision(
 
     gate_messages = [call.args[0] for call in log_mock.call_args_list]
     assert gate_messages == [
-        "[gate] loop (iteration 1/2, test FAILED)",
-        "[gate] stall (iteration 2/2, test FAILED)",
+        "[test_runner] loop (iteration 1/2, test FAILED)",
+        "[test_runner] stall (iteration 2/2, test FAILED)",
     ]
 
 
@@ -166,7 +166,7 @@ def test_gate_logs_the_deliver_decision(
     app.invoke(initial_state, config=_config())
 
     assert [call.args[0] for call in log_mock.call_args_list] == [
-        "[gate] deliver (iteration 1/5, test PASSED)"
+        "[test_runner] deliver (iteration 1/5, test PASSED)"
     ]
 
 

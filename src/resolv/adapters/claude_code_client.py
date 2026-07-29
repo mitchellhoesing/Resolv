@@ -66,10 +66,10 @@ class ClaudeCodeClient:
                     for block in message.content
                     if isinstance(block, ToolUseBlock)
                 ]
-                log_event(f"[coder-agent] turn usage={message.usage} tools={tool_names}")
+                log_event(f"[coder] turn usage={message.usage} tools={tool_names}")
             elif isinstance(message, ResultMessage):
                 log_event(
-                    f"[coder-agent] run complete: turns={message.num_turns} "
+                    f"[coder] run complete: turns={message.num_turns} "
                     f"cost_usd={message.total_cost_usd} usage={message.usage}"
                 )
                 final_result = message.result or ""
