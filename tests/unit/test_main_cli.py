@@ -21,13 +21,13 @@ def _history() -> list[IterationRecord]:
     return [
         IterationRecord(
             iteration=1,
-            diff="--- a/x\n+++ b/x\n",
+            diff="diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-old\n+new\n",
             test_status="FAILED",
             test_output="1 failed",
         ),
         IterationRecord(
             iteration=2,
-            diff="--- a/y\n+++ b/y\n",
+            diff="diff --git a/y b/y\n--- a/y\n+++ b/y\n@@ -0,0 +1,2 @@\n+one\n+two\n",
             test_status="PASSED",
             test_output="2 passed",
         ),
@@ -83,15 +83,15 @@ def test_cli_stall_path_exits_nonzero(mocker: MockerFixture) -> None:
     assert "did not converge" in result.output
 
 
-def test_render_run_summary_reports_sizes_by_default() -> None:
+def test_render_run_summary_reports_counts_by_default() -> None:
     summary = render_run_summary(
         {"test_status": "PASSED", "history": _history()}, verbose=False
     )
 
     assert summary.splitlines() == [
         "[deliver] 2 iteration(s), final status PASSED",
-        "  iteration 1: FAILED, diff 16 bytes",
-        "  iteration 2: PASSED, diff 16 bytes",
+        "  iteration 1: FAILED, wrote +1/-1 lines across 1 file(s)",
+        "  iteration 2: PASSED, wrote +2/-0 lines across 1 file(s)",
     ]
     # Unbounded content stays out of the default summary.
     assert "1 failed" not in summary
@@ -134,7 +134,7 @@ def test_cli_prints_run_summary_on_the_stall_path(mocker: MockerFixture) -> None
 
     assert result.exit_code == 1
     assert "[deliver] 2 iteration(s), final status FAILED" in result.output
-    assert "  iteration 1: FAILED, diff 16 bytes" in result.output
+    assert "  iteration 1: FAILED, wrote +1/-1 lines across 1 file(s)" in result.output
     assert "did not converge" in result.output
 
 

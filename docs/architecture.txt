@@ -104,12 +104,14 @@
                      audit trail held in state.history:
 
                          [deliver] 2 iteration(s), final status PASSED
-                           iteration 1: FAILED, diff 129 bytes
+                           iteration 1: FAILED, wrote +12/-3 lines across 2 file(s)
 
-     SIZES, NOT CONTENT. Diffs and pytest output are unbounded, and every history
-     record holds another copy of both, so the trace reports byte counts. `--verbose`
-     opts the summary in to the full content. This matters because the log is now
-     mounted onto the host rather than dying with the container.
+     COUNTS, NOT CONTENT. Diffs and pytest output are unbounded, and every history
+     record holds another copy of both, so the trace reports changed-line and
+     changed-file counts. `--verbose` opts the summary in to the full content. This
+     matters because the log is now mounted onto the host rather than dying with the
+     container. utils/diff_stats.py holds the one diff-describing helper, shared by
+     the coder node's run-log line and this summary so the two cannot drift apart.
 
   2. STATE HISTORY (LangGraph checkpointer)
 

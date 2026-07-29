@@ -26,6 +26,7 @@ from resolv.core.graph import build_graph, sqlite_checkpointer
 from resolv.core.state import BlackboardState, IterationRecord
 from resolv.dispatch import dispatch_issue, host_log_directory
 from resolv.exceptions import ResolvError
+from resolv.utils.diff_stats import describe_diff
 from resolv.utils.run_log import log_event
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
@@ -53,7 +54,7 @@ def thread_id_for(owner: str, name: str, issue: int) -> str:
 def render_run_summary(final_state: dict[str, Any], verbose: bool) -> str:
     """Render the per-iteration audit trail the loop accumulated in `history`.
 
-    Sizes only by default: diffs and test output are unbounded, and this text is
+    Counts only by default: diffs and test output are unbounded, and this text is
     written to the run log. `verbose` opts in to the full content.
     """
     history: list[IterationRecord] = final_state.get("history") or []
@@ -62,10 +63,9 @@ def render_run_summary(final_state: dict[str, Any], verbose: bool) -> str:
         f"final status {final_state.get('test_status')}"
     ]
     for record in history:
-        diff_bytes = len(record.diff) if record.diff else 0
         lines.append(
             f"  iteration {record.iteration}: {record.test_status}, "
-            f"diff {diff_bytes} bytes"
+            f"{describe_diff(record.diff)}"
         )
         if verbose:
             lines.extend(_indented_block("diff", record.diff))

@@ -80,15 +80,15 @@ did in its own terms; the gate logs which branch it took. The lines go to stdout
 [test_runner] loop (iteration 2/3, test FAILED)
 ```
 
-Diff and test-suite output are reported by size and counts, never inlined — the content
+Diff and test-suite output are reported by counts, never inlined — the content
 itself stays out of the log unless you pass `--verbose`.
 
 A run ends with a summary of the per-iteration audit trail:
 
 ```
 [deliver] 2 iteration(s), final status PASSED
-  iteration 1: FAILED, diff 129 bytes
-  iteration 2: PASSED, diff 150 bytes
+  iteration 1: FAILED, wrote +12/-3 lines across 2 file(s)
+  iteration 2: PASSED, wrote +15/-4 lines across 2 file(s)
 ```
 
 `resolv dispatch` bind-mounts a per-issue host directory onto the container's log

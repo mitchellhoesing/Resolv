@@ -128,7 +128,7 @@ def test_logs_what_the_backend_produced_without_the_diff_itself(repo: Path) -> N
     node(_state(repo))
 
     run_log = _read_run_log(repo)
-    assert "-byte diff across 1 file(s)" in run_log
+    assert "[coder] iteration 1: wrote +1/-1 lines across 1 file(s)" in run_log
     assert "secret patch body" not in run_log
 
 
@@ -136,7 +136,7 @@ def test_logs_when_the_backend_changed_nothing(repo: Path) -> None:
     backend = MagicMock()
     node = make_coder_node(backend)
     node(_state(repo))
-    assert "[coder] iteration 1: the backend left the workspace unchanged" in _read_run_log(repo)
+    assert "[coder] iteration 1: no files changed" in _read_run_log(repo)
 
 
 def test_backend_error_is_logged_and_reraised(repo: Path) -> None:
