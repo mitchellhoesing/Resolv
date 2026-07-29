@@ -1,5 +1,6 @@
 [coder]
 claude_model = "claude-opus-4-7"
+max_turns = 60
 
 [loop]
 max_iterations = 3

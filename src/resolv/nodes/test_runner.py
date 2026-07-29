@@ -14,6 +14,12 @@ from resolv.utils.sandbox import run_isolated
 
 _OUTPUT_TAIL_CHARS = 10000
 
+# Both the node's authoritative run and the coder agent's own run_tests tool
+# execute the suite through `execute_test_suite`; the prefix is what keeps the
+# two distinguishable in the run log.
+_NODE_LOG_PREFIX = "[test_runner]"
+_AGENT_LOG_PREFIX = "[coder-agent]"
+
 
 def detect_test_command(workspace: Path) -> list[str] | None:
     """Pick the test invocation by inspecting the workspace.
@@ -42,45 +48,72 @@ def detect_test_command(workspace: Path) -> list[str] | None:
     return None
 
 
+def execute_test_suite(
+    workspace_path: Path,
+    *,
+    timeout: int,
+    sandbox_runner: Callable[..., Any] = run_isolated,
+    log_prefix: str = _NODE_LOG_PREFIX,
+) -> tuple[str, str]:
+    """Detect and run the target repo's suite. Returns (status, output tail).
+
+    The single place a suite is executed: the test_runner node calls it for the
+    authoritative verdict the gate routes on, and the coder agent's run_tests
+    tool calls it for its own in-session feedback.
+    """
+    command = detect_test_command(workspace_path)
+    if command is None:
+        log_event(f"{log_prefix} error: no test runner detected")
+        return "FAILED", "no test runner detected"
+    log_event(f"{log_prefix} running: {' '.join(command)}")
+    # Prefer the per-repo venv's binaries when the env_installer created one;
+    # image binaries remain as PATH fallback.
+    venv = venv_path_for(workspace_path)
+    try:
+        result = sandbox_runner(
+            command,
+            workspace_path,
+            timeout=timeout,
+            venv_path=venv if venv.is_dir() else None,
+        )
+    except Exception as exc:
+        log_event(f"{log_prefix} error: {exc}")
+        raise
+    status = "PASSED" if result.exit_code == 0 else "FAILED"
+    combined = (result.stdout + result.stderr)[-_OUTPUT_TAIL_CHARS:]
+    log_event(_format_test_summary(combined, status, log_prefix))
+    return status, combined
+
+
+def agent_test_report(workspace_path: Path, *, timeout: int) -> str:
+    """Run the suite and render the outcome as the coder agent's tool result."""
+    status, output = execute_test_suite(
+        workspace_path, timeout=timeout, log_prefix=_AGENT_LOG_PREFIX
+    )
+    return f"{status}\n\n{output}"
+
+
 def make_test_runner_node(
     *,
     timeout: int,
     sandbox_runner: Callable[..., Any] = run_isolated,
 ) -> Callable[[BlackboardState], dict[str, Any]]:
     def test_runner_node(state: BlackboardState) -> dict[str, Any]:
-        command = detect_test_command(state.workspace_path)
-        if command is None:
-            log_event("[test_runner] error: no test runner detected")
-            return _record_and_return(state, "FAILED", "no test runner detected")
-        log_event(f"[test_runner] running: {' '.join(command)}")
-        # Prefer the per-repo venv's binaries when the env_installer created one;
-        # image binaries remain as PATH fallback.
-        venv = venv_path_for(state.workspace_path)
-        try:
-            result = sandbox_runner(
-                command,
-                state.workspace_path,
-                timeout=timeout,
-                venv_path=venv if venv.is_dir() else None,
-            )
-        except Exception as exc:
-            log_event(f"[test_runner] error: {exc}")
-            raise
-        status = "PASSED" if result.exit_code == 0 else "FAILED"
-        combined = (result.stdout + result.stderr)[-_OUTPUT_TAIL_CHARS:]
-        log_event(_format_test_summary(combined, status))
-        return _record_and_return(state, status, combined)
+        status, output = execute_test_suite(
+            state.workspace_path, timeout=timeout, sandbox_runner=sandbox_runner
+        )
+        return _record_and_return(state, status, output)
 
     return test_runner_node
 
 
-def _format_test_summary(output: str, status: str) -> str:
+def _format_test_summary(output: str, status: str, log_prefix: str) -> str:
     """Compose the log entry for a test run, with per-test counts when parseable."""
     counts = _parse_test_counts(output)
     if counts is None:
-        return f"[test_runner] status {status}"
+        return f"{log_prefix} status {status}"
     passed_count, failed_count = counts
-    return f"[test_runner] {passed_count} passed, {failed_count} failed — status {status}"
+    return f"{log_prefix} {passed_count} passed, {failed_count} failed — status {status}"
 
 
 def _parse_test_counts(output: str) -> tuple[int, int] | None:

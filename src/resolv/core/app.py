@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -16,7 +17,7 @@ from resolv.nodes.coder import make_coder_node
 from resolv.nodes.context_broker import make_context_broker_node
 from resolv.nodes.deliver import make_deliver_node
 from resolv.nodes.env_installer import make_env_installer_node
-from resolv.nodes.test_runner import make_test_runner_node
+from resolv.nodes.test_runner import agent_test_report, make_test_runner_node
 from resolv.utils.run_log import log_directory, log_event
 
 CHECKPOINT_DATABASE_NAME = "checkpoints.sqlite"
@@ -46,9 +47,16 @@ def log_node_boundaries(node_name: str, node_fn: NodeFn) -> NodeFn:
 
 def build_production_graph(settings: Settings | None = None) -> CompiledStateGraph:
     settings = settings or get_settings()
+    # The coder agent runs the suite itself through the same sandboxed path the
+    # test_runner node uses; wiring it here keeps `adapters` free of any import
+    # from `nodes`.
     coder_backend = ClaudeCodeBackend(
         ClaudeCodeClient(),
         model=settings.coder.claude_model,
+        run_suite=partial(
+            agent_test_report, timeout=settings.sandbox.test_timeout_seconds
+        ),
+        max_turns=settings.coder.max_turns,
         anthropic_api_key=settings.anthropic_api_key,
     )
     github_client = GitHubClient(settings.github_token)

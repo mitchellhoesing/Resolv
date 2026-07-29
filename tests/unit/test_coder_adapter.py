@@ -15,9 +15,19 @@ from resolv.adapters.coder import CoderBackend, render_user_prompt
 from resolv.core.state import IssueRef
 
 
+def _backend(**overrides: Any) -> ClaudeCodeBackend:
+    """Build a backend, defaulting the wiring a test isn't exercising."""
+    kwargs: dict[str, Any] = {
+        "model": "claude-sonnet-4-6",
+        "run_suite": lambda workspace: "PASSED\n\n1 passed",
+        "max_turns": 60,
+    }
+    kwargs.update(overrides)
+    return ClaudeCodeBackend(ClaudeCodeClient(), **kwargs)
+
+
 def test_claude_code_backend_satisfies_protocol() -> None:
-    backend = ClaudeCodeBackend(ClaudeCodeClient(), model="claude-sonnet-4-6")
-    assert isinstance(backend, CoderBackend)
+    assert isinstance(_backend(), CoderBackend)
 
 
 def test_render_user_prompt_includes_issue_and_feedback() -> None:
@@ -72,8 +82,7 @@ def test_generate_patch_logs_token_usage_not_prompt(
     issue = IssueRef(
         owner="a", repo="b", number=7, title="Boom", body="repro steps", labels=()
     )
-    backend = ClaudeCodeBackend(ClaudeCodeClient(), model="claude-sonnet-4-6")
-    backend.generate_patch(issue=issue, workspace_path=tmp_path, prior_feedback=None)
+    _backend().generate_patch(issue=issue, workspace_path=tmp_path, prior_feedback=None)
 
     log_contents = "\n".join(
         log_file.read_text(encoding="utf-8")
