@@ -76,13 +76,6 @@ def test_leaves_the_workspace_alone_before_dispatching(repo: Path) -> None:
     assert observed["stray_exists"] is True
 
 
-def test_logs_start(repo: Path) -> None:
-    backend = MagicMock()
-    node = make_coder_node(backend)
-    node(_state(repo))
-    assert "[coder] started" in _read_run_log(repo)
-
-
 def test_logs_what_the_backend_produced_without_the_diff_itself(repo: Path) -> None:
     def write_patch(**kwargs: object) -> None:
         (repo / "f.py").write_text("secret patch body\n", encoding="utf-8")

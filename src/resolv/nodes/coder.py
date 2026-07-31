@@ -17,7 +17,6 @@ def make_coder_node(
     backend: CoderBackend,
 ) -> Callable[[BlackboardState], dict[str, Any]]:
     def coder_node(state: BlackboardState) -> dict[str, Any]:
-        log_event("[coder] started")
         try:
             backend.generate_patch(
                 issue=state.issue,
