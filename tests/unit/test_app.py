@@ -42,10 +42,8 @@ def test_build_production_graph_wires_all_nodes(mocker: MockerFixture) -> None:
         "coder_fn",
         "test_runner_fn",
         "deliver_fn",
-        "max_iterations",
         "checkpointer",
     }
-    assert kwargs["max_iterations"] == settings.loop.max_iterations
     # Production checkpoints to disk so a finished run stays queryable.
     assert isinstance(kwargs["checkpointer"], SqliteSaver)
     assert checkpoint_database_path().is_file()
@@ -87,11 +85,11 @@ def test_log_node_boundaries_brackets_the_node_with_start_and_duration(
     log_mock = mocker.patch("resolv.core.app.log_event")
 
     def node(state: BlackboardState) -> dict[str, object]:
-        return {"iteration": 1, "current_diff": "--- a\n"}
+        return {"test_status": "PENDING", "current_diff": "--- a\n"}
 
     update = log_node_boundaries("coder", node)(sample_state)
 
-    assert update == {"iteration": 1, "current_diff": "--- a\n"}
+    assert update == {"test_status": "PENDING", "current_diff": "--- a\n"}
     entry_message, exit_message = (call.args[0] for call in log_mock.call_args_list)
     assert entry_message == "[coder] starting..."
     assert exit_message.startswith("[coder] finished in ")
@@ -103,12 +101,11 @@ def test_log_node_boundaries_reports_no_blackboard_state(
     """Node-agnostic wrapper, node-agnostic lines: state belongs to the nodes' own logs."""
     log_mock = mocker.patch("resolv.core.app.log_event")
     sample_state.current_diff = "--- a\n"
-    sample_state.iteration = 2
 
     log_node_boundaries("env_installer", lambda state: {})(sample_state)
 
     logged = " ".join(call.args[0] for call in log_mock.call_args_list)
-    for state_field in ("iteration", "diff", "test_status", "history"):
+    for state_field in ("diff", "test_status"):
         assert state_field not in logged
 
 

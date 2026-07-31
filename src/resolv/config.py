@@ -24,10 +24,9 @@ _DEFAULT_TOML = _PROJECT_ROOT / "config" / "settings.toml"
 
 class CoderSettings(BaseModel):
     claude_model: str = "claude-opus-4-7"
-
-
-class LoopSettings(BaseModel):
-    max_iterations: int = Field(default=3, ge=1, le=20)
+    # The agent runs its own edit/test cycle, so this is the only ceiling on how
+    # long one coder invocation can go.
+    max_turns: int = Field(default=60, ge=1)
 
 
 class DeliverySettings(BaseModel):
@@ -49,7 +48,6 @@ class WebhookSettings(BaseModel):
 
 class Settings(BaseSettings):
     coder: CoderSettings = CoderSettings()
-    loop: LoopSettings = LoopSettings()
     delivery: DeliverySettings = DeliverySettings()
     sandbox: SandboxSettings = SandboxSettings()
     webhook: WebhookSettings = WebhookSettings()

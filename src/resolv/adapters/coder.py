@@ -19,17 +19,15 @@ class CoderBackend(Protocol):
         self,
         issue: IssueRef,
         workspace_path: Path,
-        prior_feedback: str | None,
     ) -> None: ...
 
 
-def render_user_prompt(issue: IssueRef, prior_feedback: str | None) -> str:
+def render_user_prompt(issue: IssueRef) -> str:
     """Compose the user-facing prompt handed to the Coder backend."""
-    sections = [
-        f"# Issue #{issue.number}: {issue.title}",
-        "",
-        issue.body or "(no body provided)",
-    ]
-    if prior_feedback:
-        sections.extend(["", "## Prior attempt feedback", prior_feedback])
-    return "\n".join(sections)
+    return "\n".join(
+        [
+            f"# Issue #{issue.number}: {issue.title}",
+            "",
+            issue.body or "(no body provided)",
+        ]
+    )

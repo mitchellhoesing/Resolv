@@ -57,7 +57,7 @@ def run_isolated(
     """Run ``command`` in ``workspace_path`` with no network and scrubbed env.
 
     Returns the captured exit code and output. A timeout is reported as a
-    failed run (non-zero exit) rather than raising, so the loop can feed it
+    failed run (non-zero exit) rather than raising, so the caller can feed it
     back to the coder. Raises SandboxError only when the isolation tooling
     itself is missing.
     """

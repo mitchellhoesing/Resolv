@@ -30,11 +30,3 @@ class ConfigError(ResolvError):
 
     Currently unraised: pydantic-settings validates Settings on construction.
     """
-
-
-class LoopStallError(ResolvError):
-    """The LangGraph loop exceeded max_iterations without converging.
-
-    Currently unraised: the gate routes a stalled loop to END, and `resolv run`
-    reports non-convergence with a message and a non-zero exit code instead.
-    """

@@ -1,11 +1,11 @@
-"""Strongly-typed Pydantic V2 Blackboard state for the LangGraph loop."""
+"""Strongly-typed Pydantic V2 Blackboard state for the LangGraph pipeline."""
 
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 TestStatus = Literal["PENDING", "PASSED", "FAILED"]
 
@@ -20,14 +20,6 @@ class IssueRef(BaseModel):
     labels: tuple[str, ...] = ()
 
 
-class IterationRecord(BaseModel):
-    model_config = ConfigDict(frozen=True)
-    iteration: int
-    diff: str | None
-    test_status: TestStatus
-    test_output: str | None
-
-
 class BlackboardState(BaseModel):
     """Mutable orchestrator state passed between LangGraph nodes."""
 
@@ -36,16 +28,3 @@ class BlackboardState(BaseModel):
     current_diff: str | None = None
     test_status: TestStatus = "PENDING"
     test_output: str | None = None
-    iteration: int = 0
-    history: list[IterationRecord] = Field(default_factory=list)
-
-    def record_iteration(self) -> IterationRecord:
-        """Snapshot the current loop iteration into the history audit trail."""
-        record = IterationRecord(
-            iteration=self.iteration,
-            diff=self.current_diff,
-            test_status=self.test_status,
-            test_output=self.test_output,
-        )
-        self.history.append(record)
-        return record

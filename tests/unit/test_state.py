@@ -7,18 +7,13 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from resolv.core.state import (
-    BlackboardState,
-    IssueRef,
-    IterationRecord,
-)
+from resolv.core.state import BlackboardState, IssueRef
 
 
 def test_blackboard_defaults(sample_state: BlackboardState) -> None:
     assert sample_state.test_status == "PENDING"
-    assert sample_state.iteration == 0
-    assert sample_state.history == []
     assert sample_state.current_diff is None
+    assert sample_state.test_output is None
 
 
 def test_blackboard_round_trip_json(sample_state: BlackboardState) -> None:
@@ -32,18 +27,15 @@ def test_issue_ref_is_frozen(sample_state: BlackboardState) -> None:
         sample_state.issue.number = 999  # type: ignore[misc]
 
 
-def test_record_iteration_appends_history(sample_state: BlackboardState) -> None:
-    sample_state.current_diff = "--- a\n+++ b\n"
-    sample_state.test_status = "PASSED"
-    sample_state.test_output = "1 passed"
-    sample_state.iteration = 2
-
-    record = sample_state.record_iteration()
-
-    assert isinstance(record, IterationRecord)
-    assert record.iteration == 2
-    assert record.test_status == "PASSED"
-    assert sample_state.history == [record]
+def test_blackboard_rejects_an_unknown_test_status(
+    sample_state: BlackboardState,
+) -> None:
+    with pytest.raises(ValidationError):
+        BlackboardState(
+            issue=sample_state.issue,
+            workspace_path=sample_state.workspace_path,
+            test_status="MAYBE",  # type: ignore[arg-type]
+        )
 
 
 def test_test_status_rejects_invalid_literal(sample_issue: IssueRef, tmp_path: Path) -> None:

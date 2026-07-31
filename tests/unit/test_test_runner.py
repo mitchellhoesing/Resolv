@@ -10,7 +10,9 @@ import pytest
 from resolv.core.state import BlackboardState, IssueRef
 from resolv.nodes.test_runner import (
     _parse_test_counts,
+    agent_test_report,
     detect_test_command,
+    execute_test_suite,
     make_test_runner_node,
 )
 from resolv.utils.sandbox import SandboxResult
@@ -67,7 +69,6 @@ def test_node_marks_failed_when_no_framework(state: BlackboardState) -> None:
     result = node(state)
     assert result["test_status"] == "FAILED"
     assert "no test runner detected" in result["test_output"]
-    assert len(result["history"]) == 1
     runner.assert_not_called()
 
 
@@ -126,7 +127,7 @@ def test_logs_per_test_counts_on_pass(state: BlackboardState, tmp_path: Path) ->
     )
     node = make_test_runner_node(timeout=60, sandbox_runner=runner)
     node(state)
-    assert "3 passed, 0 failed — suite PASSED" in _read_run_log(tmp_path)
+    assert "[test_runner] 3 passed, 0 failed — status PASSED" in _read_run_log(tmp_path)
 
 
 def test_logs_per_test_counts_on_fail(state: BlackboardState, tmp_path: Path) -> None:
@@ -136,7 +137,7 @@ def test_logs_per_test_counts_on_fail(state: BlackboardState, tmp_path: Path) ->
     )
     node = make_test_runner_node(timeout=60, sandbox_runner=runner)
     node(state)
-    assert "1 passed, 2 failed — suite FAILED" in _read_run_log(tmp_path)
+    assert "[test_runner] 1 passed, 2 failed — status FAILED" in _read_run_log(tmp_path)
 
 
 def test_logs_status_only_when_counts_unparseable(
@@ -148,13 +149,13 @@ def test_logs_status_only_when_counts_unparseable(
     )
     node = make_test_runner_node(timeout=60, sandbox_runner=runner)
     node(state)
-    assert "suite finished FAILED (no test counts in its output)" in _read_run_log(tmp_path)
+    assert "[test_runner] status FAILED" in _read_run_log(tmp_path)
 
 
 def test_logs_error_when_no_framework(state: BlackboardState, tmp_path: Path) -> None:
     node = make_test_runner_node(timeout=1, sandbox_runner=MagicMock())
     node(state)
-    assert "no recognizable test layout to run" in _read_run_log(tmp_path)
+    assert "[test_runner] error: no test runner detected" in _read_run_log(tmp_path)
 
 
 def test_sandbox_error_is_logged_and_reraised(
@@ -166,6 +167,45 @@ def test_sandbox_error_is_logged_and_reraised(
     with pytest.raises(RuntimeError, match="namespace unavailable"):
         node(state)
     assert "[test_runner] error: namespace unavailable" in _read_run_log(tmp_path)
+
+
+def test_execute_test_suite_returns_status_and_output(tmp_path: Path) -> None:
+    (tmp_path / "conftest.py").write_text("")
+    runner = MagicMock(
+        return_value=SandboxResult(exit_code=1, stdout="1 passed, 2 failed", stderr="tb")
+    )
+
+    status, output = execute_test_suite(tmp_path, timeout=60, sandbox_runner=runner)
+
+    assert status == "FAILED"
+    assert output == "1 passed, 2 failedtb"
+
+
+def test_execute_test_suite_reports_missing_framework_without_running(
+    tmp_path: Path,
+) -> None:
+    runner = MagicMock()
+
+    status, output = execute_test_suite(tmp_path, timeout=60, sandbox_runner=runner)
+
+    assert (status, output) == ("FAILED", "no test runner detected")
+    runner.assert_not_called()
+
+
+def test_agent_test_report_renders_status_and_output(tmp_path: Path) -> None:
+    # No test layout, so this resolves without touching the sandbox.
+    assert agent_test_report(tmp_path, timeout=60) == (
+        "FAILED\n\nno test runner detected"
+    )
+
+
+def test_agent_test_report_logs_under_its_own_prefix(tmp_path: Path) -> None:
+    agent_test_report(tmp_path, timeout=60)
+    # The agent's own runs must stay distinguishable from the node's
+    # authoritative one in the run log.
+    log_contents = _read_run_log(tmp_path)
+    assert "[coder-agent] error: no test runner detected" in log_contents
+    assert "[test_runner]" not in log_contents
 
 
 def test_parse_counts_from_unittest_summary() -> None:

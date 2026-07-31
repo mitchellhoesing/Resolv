@@ -1,4 +1,4 @@
-"""Coder node — resets the workspace, dispatches to the selected backend, captures the diff."""
+"""Coder node — dispatches to the selected backend and captures the diff."""
 
 from __future__ import annotations
 
@@ -17,67 +17,24 @@ def make_coder_node(
     backend: CoderBackend,
 ) -> Callable[[BlackboardState], dict[str, Any]]:
     def coder_node(state: BlackboardState) -> dict[str, Any]:
-        attempt = state.iteration + 1
-        if state.iteration > 0:
-            log_event(
-                f"[coder] iteration {attempt}: discarding the workspace changes from "
-                f"iteration {state.iteration} and retrying with its test failures as feedback"
-            )
-            _reset_workspace(state.workspace_path)
-        else:
-            log_event(f"[coder] iteration {attempt}: first attempt at issue #{state.issue.number}")
-
-        prior_feedback = _compose_feedback(state)
+        log_event("[coder] started")
         try:
             backend.generate_patch(
                 issue=state.issue,
                 workspace_path=state.workspace_path,
-                prior_feedback=prior_feedback,
             )
         except Exception as exc:
             log_event(f"[coder] error: {exc}")
             raise
         diff = _capture_diff(state.workspace_path)
-        log_event(f"[coder] iteration {attempt}: {describe_diff(diff)}")
+        log_event(f"[coder] {describe_diff(diff)}")
         return {
             "current_diff": diff,
-            "iteration": attempt,
             "test_status": "PENDING",
             "test_output": None,
         }
 
     return coder_node
-
-
-_DIFF_CAP = 2000
-
-
-def _compose_feedback(state: BlackboardState) -> str | None:
-    if not state.history:
-        return None
-    header = (
-        "These are your previous attempts to fix this issue, in order. Each was "
-        "applied to the workspace and did NOT resolve it — review what was changed "
-        "and why it failed, and do not repeat the same approach."
-    )
-    blocks: list[str] = []
-    for record in state.history:
-        lines = [f"### Attempt {record.iteration} — tests {record.test_status}"]
-        if record.diff:
-            lines.append("Diff that was tried:\n```diff\n" + record.diff[:_DIFF_CAP] + "\n```")
-        if record.test_status == "FAILED" and record.test_output:
-            lines.append("Test output:\n" + record.test_output)
-        blocks.append("\n".join(lines))
-    return header + "\n\n" + "\n\n".join(blocks)
-
-
-def _reset_workspace(workspace: Path) -> None:
-    subprocess.run(
-        ["git", "reset", "--hard"], cwd=str(workspace), capture_output=True, check=False
-    )
-    subprocess.run(
-        ["git", "clean", "-fdx"], cwd=str(workspace), capture_output=True, check=False
-    )
 
 
 def _capture_diff(workspace: Path) -> str:

@@ -30,7 +30,7 @@ Precedence, lowest to highest: `config/settings.toml` → `.env` → process env
 constructor kwargs.
 
 ```bash
-RESOLV_LOOP__MAX_ITERATIONS=5 RESOLV_SANDBOX__TEST_TIMEOUT_SECONDS=900 resolv run ...
+RESOLV_CODER__MAX_TURNS=90 RESOLV_SANDBOX__TEST_TIMEOUT_SECONDS=900 resolv run ...
 ```
 
 ## Run
@@ -38,7 +38,7 @@ RESOLV_LOOP__MAX_ITERATIONS=5 RESOLV_SANDBOX__TEST_TIMEOUT_SECONDS=900 resolv ru
 CLI (runs the pipeline in-process; this is what executes inside the sandbox container):
 ```bash
 resolv run --repo owner/name --issue 123
-resolv run --repo owner/name --issue 123 --verbose   # full diff + test output per iteration
+resolv run --repo owner/name --issue 123 --verbose   # full diff + test output in the summary
 resolv run --repo owner/name --issue 123 --workspace-root ./workspaces   # default: /workspace
 ```
 
@@ -70,26 +70,32 @@ did in its own terms; the gate logs which branch it took. The lines go to stdout
 
 ```
 [coder] starting...
-[coder] iteration 2: discarding the workspace changes from iteration 1 and retrying with its test failures as feedback
-[coder] iteration 2: wrote a 640-byte diff across 3 file(s)
+[coder-agent] turn usage={...} tools=['mcp__resolv__run_tests']
+[coder-agent] run complete: turns=14 cost_usd=0.42 usage={...}
+[coder] wrote +12/-3 lines across 2 file(s)
 [coder] finished in 74.1s
 [test_runner] starting...
-[test_runner] iteration 2: running pytest --tb=short
-[test_runner] iteration 2: 3 passed, 1 failed — suite FAILED
+[test_runner] running: pytest --tb=short
+[test_runner] 4 passed, 0 failed — status PASSED
 [test_runner] finished in 6.2s
-[test_runner] loop (iteration 2/3, test FAILED)
+[gate] deliver (test PASSED)
 ```
+
+The coder agent runs the suite itself mid-session through `run_tests`, so several
+`[coder-agent]` turns appear before the single authoritative `[test_runner]` line.
 
 Diff and test-suite output are reported by counts, never inlined — the content
 itself stays out of the log unless you pass `--verbose`.
 
-A run ends with a summary of the per-iteration audit trail:
+A run ends with a one-line summary:
 
 ```
-[deliver] 2 iteration(s), final status PASSED
-  iteration 1: FAILED, wrote +12/-3 lines across 2 file(s)
-  iteration 2: PASSED, wrote +15/-4 lines across 2 file(s)
+[summary] final status PASSED, wrote +15/-4 lines across 2 file(s)
 ```
+
+A run whose suite does not pass ends at the gate with a non-zero exit code; there is
+no retry, so read `[coder-agent] final message:` in the log to see where the agent
+stopped.
 
 `resolv dispatch` bind-mounts a per-issue host directory onto the container's log
 directory, so both the logs and the checkpoint database survive the `--rm` container:
@@ -105,17 +111,18 @@ there to be queried. Read a finished run back on the host:
 resolv inspect --repo owner/name --issue 123
 ```
 ```
-[history] 9 checkpoint(s)
-  before coder           iteration=0 test_status=PENDING  history=0
-  before test_runner     iteration=1 test_status=PENDING  history=0
-  before coder           iteration=1 test_status=FAILED   history=1
-  before test_runner     iteration=2 test_status=PENDING  history=1
-  before deliver         iteration=2 test_status=PASSED   history=2
+[history] 7 checkpoint(s)
+  before context_broker  test_status=PENDING  no files changed
+  before env_installer   test_status=PENDING  no files changed
+  before coder           test_status=PENDING  no files changed
+  before test_runner     test_status=PENDING  wrote +15/-4 lines across 2 file(s)
+  before deliver         test_status=PASSED   wrote +15/-4 lines across 2 file(s)
 ```
 
-Note the second `coder` line: the failed first attempt is still recoverable even
-though the run finished `PASSED`. This needs no credentials — it reads the database
-directly. Pass `--database <path>` to point at one explicitly.
+Every intermediate state is recoverable, not just the final one — the `PENDING` row
+above is the workspace as the coder left it, before the suite was judged. This needs
+no credentials — it reads the database directly. Pass `--database <path>` to point at
+one explicitly.
 
 The database lives at one path per issue and outlives the `--rm` container, so
 re-dispatching an issue adds to the same file. Each run is keyed separately, and

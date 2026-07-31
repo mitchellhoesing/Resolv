@@ -26,7 +26,7 @@ from resolv.core.app import (
     checkpoint_database_path,
 )
 from resolv.core.graph import sqlite_checkpointer
-from resolv.core.state import BlackboardState, IterationRecord
+from resolv.core.state import BlackboardState
 from resolv.dispatch import dispatch_issue, host_log_directory
 from resolv.exceptions import ResolvError
 from resolv.utils.diff_stats import describe_diff
@@ -82,29 +82,24 @@ def thread_id_for(owner: str, name: str, issue: int, run_marker: str) -> str:
 
 
 def render_run_summary(final_state: dict[str, Any], verbose: bool) -> str:
-    """Render the per-iteration audit trail the loop accumulated in `history`.
+    """Render the run's outcome: final status and the size of what it produced.
 
     Counts only by default: diffs and test output are unbounded, and this text is
     written to the run log. `verbose` opts in to the full content.
     """
-    history: list[IterationRecord] = final_state.get("history") or []
+    diff: str | None = final_state.get("current_diff")
     lines = [
-        f"[deliver] {len(history)} iteration(s), "
-        f"final status {final_state.get('test_status')}"
+        f"[summary] final status {final_state.get('test_status')}, "
+        f"{describe_diff(diff)}"
     ]
-    for record in history:
-        lines.append(
-            f"  iteration {record.iteration}: {record.test_status}, "
-            f"{describe_diff(record.diff)}"
-        )
-        if verbose:
-            lines.extend(_indented_block("diff", record.diff))
-            lines.extend(_indented_block("test output", record.test_output))
+    if verbose:
+        lines.extend(_indented_block("diff", diff))
+        lines.extend(_indented_block("test output", final_state.get("test_output")))
     return "\n".join(lines)
 
 
 def _indented_block(label: str, content: str | None) -> list[str]:
-    """Render one labelled, indented block of an iteration's captured content."""
+    """Render one labelled, indented block of the run's captured content."""
     if not content:
         return []
     body = "\n".join(f"      {line}" for line in content.splitlines())
@@ -123,7 +118,7 @@ def run(
     verbose: bool = typer.Option(
         False,
         "--verbose",
-        help="Include each iteration's diff and test output in the run summary.",
+        help="Include the full diff and test output in the run summary.",
     ),
 ) -> None:
     """Run the pipeline in-process for a single issue (inside the sandbox container)."""
@@ -162,9 +157,11 @@ def run(
     if final_state.get("test_status") == "PASSED":
         typer.echo(final_state.get("test_output") or "PR opened")
         raise typer.Exit(0)
+    # There is no retry: the coder agent already ran its own edit/test cycle, so
+    # a non-PASSED verdict here is a handoff to a human.
     typer.echo(
-        f"Loop did not converge after {final_state.get('iteration', 0)} iterations "
-        f"(test={final_state.get('test_status')})",
+        f"Coder agent did not reach a passing suite (test={final_state.get('test_status')}); "
+        "see the run log for the agent's final message",
         err=True,
     )
     raise typer.Exit(1)
@@ -175,16 +172,15 @@ class CheckpointSummary:
     """One node boundary, read from a checkpoint without rebuilding the state."""
 
     next_node: str
-    iteration: int
     test_status: str
-    history_length: int
+    diff: str | None
 
 
 def render_state_history(summaries: list[CheckpointSummary]) -> str:
     """Render one line per node boundary, oldest first.
 
     Each summary names the node that was about to run, so the sequence traces
-    the executed path — including iterations the final state overwrote.
+    the executed path — including state the final result overwrote.
     """
     if not summaries:
         return "[history] no checkpoints recorded"
@@ -192,9 +188,8 @@ def render_state_history(summaries: list[CheckpointSummary]) -> str:
     for summary in summaries:
         lines.append(
             f"  before {summary.next_node:<15} "
-            f"iteration={summary.iteration} "
             f"test_status={summary.test_status:<8} "
-            f"history={summary.history_length}"
+            f"{describe_diff(summary.diff)}"
         )
     return "\n".join(lines)
 
@@ -277,9 +272,8 @@ def summarize_checkpoint(channel_values: dict[str, Any]) -> CheckpointSummary:
         next_node = "(end)"
     return CheckpointSummary(
         next_node=next_node,
-        iteration=channel_values.get("iteration", 0),
         test_status=str(channel_values.get("test_status", "-")),
-        history_length=len(channel_values.get("history") or []),
+        diff=channel_values.get("current_diff"),
     )
 
 

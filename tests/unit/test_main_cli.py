@@ -11,7 +11,7 @@ from typer.testing import CliRunner
 
 from resolv.config import Settings
 from resolv.core.graph import build_graph, sqlite_checkpointer
-from resolv.core.state import BlackboardState, IssueRef, IterationRecord
+from resolv.core.state import BlackboardState, IssueRef
 from resolv.exceptions import CoderError
 from resolv.main import (
     app,
@@ -25,21 +25,12 @@ from resolv.main import (
 runner = CliRunner()
 
 
-def _history() -> list[IterationRecord]:
-    return [
-        IterationRecord(
-            iteration=1,
-            diff="diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-old\n+new\n",
-            test_status="FAILED",
-            test_output="1 failed",
-        ),
-        IterationRecord(
-            iteration=2,
-            diff="diff --git a/y b/y\n--- a/y\n+++ b/y\n@@ -0,0 +1,2 @@\n+one\n+two\n",
-            test_status="PASSED",
-            test_output="2 passed",
-        ),
-    ]
+def _finished_run(status: str = "PASSED") -> dict[str, object]:
+    return {
+        "test_status": status,
+        "test_output": "1 failed",
+        "current_diff": "diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-old\n+new\n",
+    }
 
 
 def _stub_settings() -> Settings:
@@ -63,7 +54,6 @@ def test_cli_success_path_reports_pr_url(mocker: MockerFixture) -> None:
     graph.invoke.return_value = {
         "test_status": "PASSED",
         "test_output": "PR opened: https://github.com/a/b/pull/9",
-        "iteration": 1,
     }
     mocker.patch("resolv.main.build_production_graph", return_value=graph)
 
@@ -80,15 +70,12 @@ def test_cli_stall_path_exits_nonzero(mocker: MockerFixture) -> None:
     )
     mocker.patch("resolv.main.GitHubClient", return_value=github)
     graph = MagicMock()
-    graph.invoke.return_value = {
-        "test_status": "FAILED",
-        "iteration": 5,
-    }
+    graph.invoke.return_value = {"test_status": "FAILED"}
     mocker.patch("resolv.main.build_production_graph", return_value=graph)
 
     result = runner.invoke(app, ["run", "--repo", "a/b", "--issue", "1"])
     assert result.exit_code == 1
-    assert "did not converge" in result.output
+    assert "Coder agent did not reach a passing suite" in result.output
 
 
 def test_cli_logs_the_error_when_the_pipeline_raises(mocker: MockerFixture) -> None:
@@ -111,25 +98,17 @@ def test_cli_logs_the_error_when_the_pipeline_raises(mocker: MockerFixture) -> N
     assert "Claude Code backend failed: boom" in logged
 
 
-def test_render_run_summary_reports_counts_by_default() -> None:
-    summary = render_run_summary(
-        {"test_status": "PASSED", "history": _history()}, verbose=False
-    )
+def test_render_run_summary_reports_sizes_by_default() -> None:
+    summary = render_run_summary(_finished_run(), verbose=False)
 
-    assert summary.splitlines() == [
-        "[deliver] 2 iteration(s), final status PASSED",
-        "  iteration 1: FAILED, wrote +1/-1 lines across 1 file(s)",
-        "  iteration 2: PASSED, wrote +2/-0 lines across 1 file(s)",
-    ]
+    assert summary == "[summary] final status PASSED, wrote +1/-1 lines across 1 file(s)"
     # Unbounded content stays out of the default summary.
     assert "1 failed" not in summary
     assert "--- a/x" not in summary
 
 
 def test_render_run_summary_includes_content_when_verbose() -> None:
-    summary = render_run_summary(
-        {"test_status": "PASSED", "history": _history()}, verbose=True
-    )
+    summary = render_run_summary(_finished_run(), verbose=True)
 
     assert "    diff:" in summary
     assert "      --- a/x" in summary
@@ -137,10 +116,10 @@ def test_render_run_summary_includes_content_when_verbose() -> None:
     assert "      1 failed" in summary
 
 
-def test_render_run_summary_handles_a_run_with_no_iterations() -> None:
+def test_render_run_summary_handles_a_run_that_produced_nothing() -> None:
     summary = render_run_summary({"test_status": "FAILED"}, verbose=True)
 
-    assert summary == "[deliver] 0 iteration(s), final status FAILED"
+    assert summary == "[summary] final status FAILED, no files changed"
 
 
 def test_cli_prints_run_summary_on_the_stall_path(mocker: MockerFixture) -> None:
@@ -151,19 +130,17 @@ def test_cli_prints_run_summary_on_the_stall_path(mocker: MockerFixture) -> None
     )
     mocker.patch("resolv.main.GitHubClient", return_value=github)
     graph = MagicMock()
-    graph.invoke.return_value = {
-        "test_status": "FAILED",
-        "iteration": 2,
-        "history": _history(),
-    }
+    graph.invoke.return_value = _finished_run("FAILED")
     mocker.patch("resolv.main.build_production_graph", return_value=graph)
 
     result = runner.invoke(app, ["run", "--repo", "a/b", "--issue", "1"])
 
     assert result.exit_code == 1
-    assert "[deliver] 2 iteration(s), final status FAILED" in result.output
-    assert "  iteration 1: FAILED, wrote +1/-1 lines across 1 file(s)" in result.output
-    assert "did not converge" in result.output
+    assert (
+        "[summary] final status FAILED, wrote +1/-1 lines across 1 file(s)"
+        in result.output
+    )
+    assert "Coder agent did not reach a passing suite" in result.output
 
 
 def test_cli_verbose_flag_expands_the_summary(mocker: MockerFixture) -> None:
@@ -174,12 +151,7 @@ def test_cli_verbose_flag_expands_the_summary(mocker: MockerFixture) -> None:
     )
     mocker.patch("resolv.main.GitHubClient", return_value=github)
     graph = MagicMock()
-    graph.invoke.return_value = {
-        "test_status": "PASSED",
-        "test_output": "PR opened: https://github.com/a/b/pull/9",
-        "iteration": 2,
-        "history": _history(),
-    }
+    graph.invoke.return_value = _finished_run()
     mocker.patch("resolv.main.build_production_graph", return_value=graph)
 
     quiet = runner.invoke(app, ["run", "--repo", "a/b", "--issue", "1"])
@@ -207,7 +179,6 @@ def _write_checkpoint_database(destination: Path, thread_id: str = "a/b#1@RUN-1"
         coder_fn=stub_coder,
         test_runner_fn=stub_test_runner,
         deliver_fn=stub_deliver,
-        max_iterations=1,
         checkpointer=sqlite_checkpointer(destination),
     )
     issue = IssueRef(owner="a", repo="b", number=1, title="t", body="", labels=())
@@ -330,11 +301,16 @@ def test_cli_inspect_without_a_database_names_both_paths_it_tried() -> None:
 
 def test_summarize_checkpoint_reads_the_queued_node() -> None:
     summary = summarize_checkpoint(
-        {"branch:to:test_runner": None, "iteration": 2, "test_status": "PENDING"}
+        {
+            "branch:to:test_runner": None,
+            "test_status": "PENDING",
+            "current_diff": "diff --git a/x b/x\n@@ -1 +1 @@\n-old\n+new\n",
+        }
     )
 
     assert summary.next_node == "test_runner"
-    assert summary.iteration == 2
+    assert summary.test_status == "PENDING"
+    assert summary.diff is not None
 
 
 def test_summarize_checkpoint_names_the_input_and_final_boundaries() -> None:
