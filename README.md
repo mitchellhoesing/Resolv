@@ -74,7 +74,7 @@ did in its own terms; the gate logs which branch it took. The lines go to stdout
 [coder] iteration 2: wrote a 640-byte diff across 3 file(s)
 [coder] finished in 74.1s
 [test_runner] starting...
-[test_runner] iteration 2: running pytest -q --tb=short
+[test_runner] iteration 2: running pytest --tb=short
 [test_runner] iteration 2: 3 passed, 1 failed — suite FAILED
 [test_runner] finished in 6.2s
 [test_runner] loop (iteration 2/3, test FAILED)
@@ -117,9 +117,23 @@ Note the second `coder` line: the failed first attempt is still recoverable even
 though the run finished `PASSED`. This needs no credentials — it reads the database
 directly. Pass `--database <path>` to point at one explicitly.
 
+The database lives at one path per issue and outlives the `--rm` container, so
+re-dispatching an issue adds to the same file. Each run is keyed separately, and
+`inspect` reads the most recent one unless told otherwise:
+
+```bash
+resolv inspect --repo owner/name --issue 123 --run 2026-07-31T01-56-25Z
+```
+
+The run marker is a UTC timestamp minted at startup and logged as
+`[run] owner/name#123 run <marker>`, which is what ties a log file to its
+checkpoints. When a database holds more than one run, `inspect` names the one it
+picked. Databases written before markers existed keep every run in a single
+history; they are still readable, just interleaved.
+
 In Python, `graph.get_state(config)` and `graph.get_state_history(config)` give the
 same data as objects, keyed by a `thread_id` (`resolv.main.thread_id_for` builds one
-as `owner/name#issue`).
+as `owner/name#issue@<marker>`).
 
 ## Test
 
