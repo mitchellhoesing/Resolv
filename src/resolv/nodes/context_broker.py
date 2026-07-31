@@ -26,13 +26,16 @@ def make_context_broker_node(
 ) -> Callable[[BlackboardState], dict[str, Any]]:
     def context_broker_node(state: BlackboardState) -> dict[str, Any]:
         workspace = state.workspace_path
+        target_repository = f"{state.issue.owner}/{state.issue.repo}"
         if not (workspace / ".git").exists():
-            log_event(
-                f"[context_broker] cloning {state.issue.owner}/{state.issue.repo}"
-            )
+            log_event(f"[context_broker] cloning {target_repository} into {workspace}")
             _clone(state.issue.owner, state.issue.repo, workspace, github_token)
+            log_event(f"[context_broker] cloned {target_repository}")
         else:
-            log_event("[context_broker] workspace already present")
+            log_event(
+                f"[context_broker] {target_repository} already cloned at {workspace}; "
+                f"skipping clone"
+            )
         return {}
 
     return context_broker_node

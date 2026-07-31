@@ -1,4 +1,4 @@
-Every node below is wrapped by `log_node_boundaries` (core/app.py) at the production wiring layer, so each one logs the state it received and the keys it returned without the node modules carrying any trace code of their own. The `Returns:` dicts documented here are exactly what shows up in those `exit wrote ...` lines.
+Every node below is wrapped by `log_node_boundaries` (core/app.py) at the production wiring layer, which brackets the node with a `starting...` line and a `finished in Ns` line. Those are the only node-agnostic facts, so they are all the wrapper logs — what a node actually did (which repo, which command, what came out of it) each node logs itself, in terms that mean something for its own job. The `Returns:` dicts documented here are Blackboard plumbing and are deliberately *not* logged.
 
 ---
 

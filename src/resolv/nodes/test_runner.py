@@ -26,6 +26,10 @@ def detect_test_command(workspace: Path) -> list[str] | None:
 
     Detection order: pytest config → tox.ini → unittest. Returns None when
     no recognizable test layout is present.
+
+    No `-q` is passed: it is additive with any `-q` the target's own `addopts`
+    already sets, and at `-qq` pytest drops the "N passed, M failed" line that
+    `_parse_test_counts` reads. `--tb=short` is what actually bounds the output.
     """
     pyproject = workspace / "pyproject.toml"
     if pyproject.is_file():
@@ -34,9 +38,9 @@ def detect_test_command(workspace: Path) -> list[str] | None:
         except OSError:
             text = ""
         if "[tool.pytest.ini_options]" in text:
-            return ["pytest", "-q", "--tb=short"]
+            return ["pytest", "--tb=short"]
     if (workspace / "pytest.ini").is_file() or (workspace / "conftest.py").is_file():
-        return ["pytest", "-q", "--tb=short"]
+        return ["pytest", "--tb=short"]
     if (workspace / "tox.ini").is_file():
         return ["tox", "-q"]
     tests_dir = workspace / "tests"

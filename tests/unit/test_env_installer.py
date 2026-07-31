@@ -241,7 +241,7 @@ def test_node_proceeds_when_no_manifests(
     assert result == {}
     # venv creation + pytest seed only.
     assert runner.call_count == 2
-    assert "no dependency manifests detected" in _read_run_log(tmp_path)
+    assert "no dependency manifests found in the repo" in _read_run_log(tmp_path)
 
 
 def test_node_raises_install_error_on_nonzero_exit(state: BlackboardState) -> None:

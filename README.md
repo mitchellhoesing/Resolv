@@ -64,28 +64,33 @@ uvicorn --factory resolv.webhook:create_app --host 0.0.0.0 --port 8080
 
 ## Inspecting a run
 
-Every node logs the state it received and the keys it wrote, and the gate logs which
-branch it took. The lines go to stdout and to `logs/<DD-MM-YYYYTHH-MM>Z.log`:
+Each node is bracketed by a `starting...` / `finished in Ns` pair and reports what it
+did in its own terms; the gate logs which branch it took. The lines go to stdout and to
+`logs/<DD-MM-YYYYTHH-MM>Z.log`:
 
 ```
-[coder] enter test_status=PENDING diff_bytes=0
+[coder] starting...
 [coder-agent] turn usage={...} tools=['mcp__resolv__run_tests']
 [coder-agent] run complete: turns=14 cost_usd=0.42 usage={...}
-[coder] exit wrote current_diff, test_output, test_status
+[coder] wrote +12/-3 lines across 2 file(s)
+[coder] finished in 74.1s
+[test_runner] starting...
+[test_runner] running: pytest --tb=short
 [test_runner] 4 passed, 0 failed — status PASSED
+[test_runner] finished in 6.2s
 [gate] deliver (test PASSED)
 ```
 
 The coder agent runs the suite itself mid-session through `run_tests`, so several
 `[coder-agent]` turns appear before the single authoritative `[test_runner]` line.
 
-`diff_bytes` is a size, not content — the diff and test output themselves stay out of
-the log unless you pass `--verbose`.
+Diff and test-suite output are reported by counts, never inlined — the content
+itself stays out of the log unless you pass `--verbose`.
 
 A run ends with a one-line summary:
 
 ```
-[summary] final status PASSED, diff 150 bytes
+[summary] final status PASSED, wrote +15/-4 lines across 2 file(s)
 ```
 
 A run whose suite does not pass ends at the gate with a non-zero exit code; there is
@@ -107,11 +112,11 @@ resolv inspect --repo owner/name --issue 123
 ```
 ```
 [history] 7 checkpoint(s)
-  before context_broker  test_status=PENDING  diff_bytes=0
-  before env_installer   test_status=PENDING  diff_bytes=0
-  before coder           test_status=PENDING  diff_bytes=0
-  before test_runner     test_status=PENDING  diff_bytes=150
-  before deliver         test_status=PASSED   diff_bytes=150
+  before context_broker  test_status=PENDING  no files changed
+  before env_installer   test_status=PENDING  no files changed
+  before coder           test_status=PENDING  no files changed
+  before test_runner     test_status=PENDING  wrote +15/-4 lines across 2 file(s)
+  before deliver         test_status=PASSED   wrote +15/-4 lines across 2 file(s)
 ```
 
 Every intermediate state is recoverable, not just the final one — the `PENDING` row
@@ -119,9 +124,23 @@ above is the workspace as the coder left it, before the suite was judged. This n
 no credentials — it reads the database directly. Pass `--database <path>` to point at
 one explicitly.
 
+The database lives at one path per issue and outlives the `--rm` container, so
+re-dispatching an issue adds to the same file. Each run is keyed separately, and
+`inspect` reads the most recent one unless told otherwise:
+
+```bash
+resolv inspect --repo owner/name --issue 123 --run 2026-07-31T01-56-25Z
+```
+
+The run marker is a UTC timestamp minted at startup and logged as
+`[run] owner/name#123 run <marker>`, which is what ties a log file to its
+checkpoints. When a database holds more than one run, `inspect` names the one it
+picked. Databases written before markers existed keep every run in a single
+history; they are still readable, just interleaved.
+
 In Python, `graph.get_state(config)` and `graph.get_state_history(config)` give the
 same data as objects, keyed by a `thread_id` (`resolv.main.thread_id_for` builds one
-as `owner/name#issue`).
+as `owner/name#issue@<marker>`).
 
 ## Test
 

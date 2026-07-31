@@ -27,23 +27,15 @@ def test_issue_ref_is_frozen(sample_state: BlackboardState) -> None:
         sample_state.issue.number = 999  # type: ignore[misc]
 
 
-def test_summary_reports_shape_without_embedding_content(
+def test_blackboard_rejects_an_unknown_test_status(
     sample_state: BlackboardState,
 ) -> None:
-    sample_state.current_diff = "x" * 50_000
-    sample_state.test_output = "secret failure detail"
-    sample_state.test_status = "FAILED"
-
-    summary = sample_state.summary()
-
-    assert summary == "test_status=FAILED diff_bytes=50000"
-    # The unbounded fields must never be inlined into the log line.
-    assert "x" * 100 not in summary
-    assert "secret failure detail" not in summary
-
-
-def test_summary_handles_empty_state(sample_state: BlackboardState) -> None:
-    assert sample_state.summary() == "test_status=PENDING diff_bytes=0"
+    with pytest.raises(ValidationError):
+        BlackboardState(
+            issue=sample_state.issue,
+            workspace_path=sample_state.workspace_path,
+            test_status="MAYBE",  # type: ignore[arg-type]
+        )
 
 
 def test_test_status_rejects_invalid_literal(sample_issue: IssueRef, tmp_path: Path) -> None:

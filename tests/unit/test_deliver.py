@@ -61,11 +61,12 @@ def test_creates_branch_commits_pushes_and_opens_pr(
     assert "PR opened: https://github.com/acme/widgets/pull/9" in result["test_output"]
 
     log_contents = _read_run_log(state.workspace_path)
-    assert "repo=acme/widgets" in log_contents
-    assert "branch=resolv/issue-7" in log_contents
-    assert 'commit="fix: resolve issue #7' in log_contents
-    assert "issue=#7" in log_contents
-    assert "pr=https://github.com/acme/widgets/pull/9" in log_contents
+    assert "acme/widgets" in log_contents
+    assert "resolv/issue-7" in log_contents
+    assert (
+        "[deliver] opened PR https://github.com/acme/widgets/pull/9 from "
+        "resolv/issue-7 into main, resolving issue #7"
+    ) in log_contents
 
 
 def test_warns_in_pr_body_when_diff_touches_tests(

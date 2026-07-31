@@ -136,14 +136,18 @@ def make_env_installer_node(
     installer_runner: Callable[..., Any] = run_networked,
 ) -> Callable[[BlackboardState], dict[str, Any]]:
     def env_installer_node(state: BlackboardState) -> dict[str, Any]:
-        log_event(f"[env_installer] installing {state.issue.repo} dev/test dependencies")
         workspace = state.workspace_path
         venv = venv_path_for(workspace)
+        target_repository = f"{state.issue.owner}/{state.issue.repo}"
+        log_event(
+            f"[env_installer] installing {target_repository} dev/test dependencies "
+            f"into {venv}"
+        )
 
         if (venv / "bin" / "python").exists():
-            log_event("[env_installer] venv already present")
+            log_event("[env_installer] reusing the venv already at that path")
         else:
-            log_event(f"[env_installer] creating venv at {venv}")
+            log_event("[env_installer] creating the venv")
             _run_step(
                 InstallStep(
                     command=[sys.executable, "-m", "venv", str(venv)],
@@ -167,7 +171,10 @@ def make_env_installer_node(
 
         plan = detect_install_plan(workspace, venv)
         if not plan:
-            log_event("[env_installer] no dependency manifests detected; proceeding")
+            log_event(
+                "[env_installer] no dependency manifests found in the repo; "
+                "the venv has pytest only"
+            )
         preexisting_lockfiles = {
             lockfile_name
             for lockfile_name in _LOCKFILE_NAMES
@@ -182,6 +189,11 @@ def make_env_installer_node(
                 venv_path=venv,
             )
         _remove_generated_lockfiles(workspace, preexisting_lockfiles)
+        if plan:
+            log_event(
+                f"[env_installer] installed {target_repository} dev/test dependencies "
+                f"via {', '.join(step.label for step in plan)}"
+            )
         return {}
 
     return env_installer_node

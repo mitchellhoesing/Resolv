@@ -9,6 +9,7 @@ from typing import Any
 
 from resolv.adapters.coder import CoderBackend
 from resolv.core.state import BlackboardState
+from resolv.utils.diff_stats import describe_diff
 from resolv.utils.run_log import log_event
 
 
@@ -26,6 +27,7 @@ def make_coder_node(
             log_event(f"[coder] error: {exc}")
             raise
         diff = _capture_diff(state.workspace_path)
+        log_event(f"[coder] {describe_diff(diff)}")
         return {
             "current_diff": diff,
             "test_status": "PENDING",

@@ -33,12 +33,18 @@ def state(tmp_path: Path) -> BlackboardState:
 
 def test_detects_pyproject_pytest(tmp_path: Path) -> None:
     (tmp_path / "pyproject.toml").write_text("[tool.pytest.ini_options]\naddopts = '-q'\n")
-    assert detect_test_command(tmp_path) == ["pytest", "-q", "--tb=short"]
+    assert detect_test_command(tmp_path) == ["pytest", "--tb=short"]
 
 
 def test_detects_conftest_only(tmp_path: Path) -> None:
     (tmp_path / "conftest.py").write_text("")
-    assert detect_test_command(tmp_path) == ["pytest", "-q", "--tb=short"]
+    assert detect_test_command(tmp_path) == ["pytest", "--tb=short"]
+
+
+def test_detected_pytest_command_adds_no_quiet_flag(tmp_path: Path) -> None:
+    """A target's own `-q` must not be doubled into `-qq`, which suppresses counts."""
+    (tmp_path / "pyproject.toml").write_text("[tool.pytest.ini_options]\naddopts = '-q'\n")
+    assert "-q" not in detect_test_command(tmp_path)
 
 
 def test_detects_tox_when_no_pytest_signals(tmp_path: Path) -> None:

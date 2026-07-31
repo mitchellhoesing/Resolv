@@ -89,11 +89,19 @@
 
   1. TEXT TRACE (utils/run_log.py -> stdout + logs/<DD-MM-YYYYTHH-MM>Z.log)
 
-     core/app.py     log_node_boundaries() wraps each node at the wiring layer, so
-                     the node modules themselves stay free of trace logging:
+     core/app.py     log_node_boundaries() brackets each node at the wiring layer
+                     with the only two node-agnostic facts there are — which node
+                     is running, and how long it ran:
 
-                         [coder] enter test_status=PENDING diff_bytes=0
-                         [coder] exit wrote current_diff, test_output, test_status
+                         [coder] starting...
+                         [coder] finished in 74.1s
+
+     nodes/*.py      each node logs what it is doing in its own terms; nothing
+                     about the Blackboard is dumped generically, so a node never
+                     reports state that is irrelevant to its job:
+
+                         [coder] wrote +12/-3 lines across 2 file(s)
+                         [test_runner] 3 passed, 1 failed — status FAILED
 
      adapters/       the agent's own turns are logged as it works, so its internal
      claude_code_    edit -> test -> fix cycle is visible without exposing prompts:
@@ -114,12 +122,14 @@
      main.py         render_run_summary() closes the run with its outcome and the
                      size of what it produced:
 
-                         [summary] final status PASSED, diff 129 bytes
+                         [summary] final status PASSED, wrote +15/-4 lines across 2 file(s)
 
-     SIZES, NOT CONTENT. Diffs and pytest output are unbounded, so the trace reports
-     byte counts. `--verbose` opts the summary in to the full content. This matters
-     because the log is now mounted onto the host rather than dying with the
-     container.
+     COUNTS, NOT CONTENT. Diffs and pytest output are unbounded, so the trace reports
+     changed-line and changed-file counts. `--verbose` opts the summary in to the full
+     content. This matters because the log is now mounted onto the host rather than
+     dying with the container. utils/diff_stats.py holds the one diff-describing
+     helper, shared by the coder node's run-log line and this summary so the two
+     cannot drift apart.
 
   2. STATE HISTORY (LangGraph checkpointer)
 

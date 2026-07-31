@@ -79,7 +79,7 @@ def test_build_production_graph_wraps_every_node_with_logging(
     ]
 
 
-def test_log_node_boundaries_records_entry_and_written_keys(
+def test_log_node_boundaries_brackets_the_node_with_start_and_duration(
     sample_state: BlackboardState, mocker: MockerFixture
 ) -> None:
     log_mock = mocker.patch("resolv.core.app.log_event")
@@ -91,21 +91,22 @@ def test_log_node_boundaries_records_entry_and_written_keys(
 
     assert update == {"test_status": "PENDING", "current_diff": "--- a\n"}
     entry_message, exit_message = (call.args[0] for call in log_mock.call_args_list)
-    assert entry_message == f"[coder] enter {sample_state.summary()}"
-    # Keys are sorted so the line is stable across runs.
-    assert exit_message == "[coder] exit wrote current_diff, test_status"
+    assert entry_message == "[coder] starting..."
+    assert exit_message.startswith("[coder] finished in ")
 
 
-def test_log_node_boundaries_marks_nodes_that_write_nothing(
+def test_log_node_boundaries_reports_no_blackboard_state(
     sample_state: BlackboardState, mocker: MockerFixture
 ) -> None:
+    """Node-agnostic wrapper, node-agnostic lines: state belongs to the nodes' own logs."""
     log_mock = mocker.patch("resolv.core.app.log_event")
+    sample_state.current_diff = "--- a\n"
 
     log_node_boundaries("env_installer", lambda state: {})(sample_state)
 
-    assert log_mock.call_args_list[-1].args[0] == (
-        "[env_installer] exit wrote (no changes)"
-    )
+    logged = " ".join(call.args[0] for call in log_mock.call_args_list)
+    for state_field in ("diff", "test_status"):
+        assert state_field not in logged
 
 
 def test_log_node_boundaries_does_not_swallow_node_failures(
