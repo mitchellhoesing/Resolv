@@ -7,7 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from resolv.core.state import BlackboardState, IterationRecord
+from resolv.core.state import BlackboardState
 from resolv.nodes.env_installer import venv_path_for
 from resolv.utils.run_log import log_event
 from resolv.utils.sandbox import run_isolated
@@ -102,7 +102,7 @@ def make_test_runner_node(
         status, output = execute_test_suite(
             state.workspace_path, timeout=timeout, sandbox_runner=sandbox_runner
         )
-        return _record_and_return(state, status, output)
+        return {"test_status": status, "test_output": output}
 
     return test_runner_node
 
@@ -137,17 +137,3 @@ def _parse_test_counts(output: str) -> tuple[int, int] | None:
     return None
 
 
-def _record_and_return(
-    state: BlackboardState, status: str, output: str
-) -> dict[str, Any]:
-    record = IterationRecord(
-        iteration=state.iteration,
-        diff=state.current_diff,
-        test_status=status,  # type: ignore[arg-type]
-        test_output=output,
-    )
-    return {
-        "test_status": status,
-        "test_output": output,
-        "history": [*state.history, record],
-    }

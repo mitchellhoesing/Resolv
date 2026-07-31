@@ -85,15 +85,15 @@ def test_log_node_boundaries_records_entry_and_written_keys(
     log_mock = mocker.patch("resolv.core.app.log_event")
 
     def node(state: BlackboardState) -> dict[str, object]:
-        return {"iteration": 1, "current_diff": "--- a\n"}
+        return {"test_status": "PENDING", "current_diff": "--- a\n"}
 
     update = log_node_boundaries("coder", node)(sample_state)
 
-    assert update == {"iteration": 1, "current_diff": "--- a\n"}
+    assert update == {"test_status": "PENDING", "current_diff": "--- a\n"}
     entry_message, exit_message = (call.args[0] for call in log_mock.call_args_list)
     assert entry_message == f"[coder] enter {sample_state.summary()}"
     # Keys are sorted so the line is stable across runs.
-    assert exit_message == "[coder] exit wrote current_diff, iteration"
+    assert exit_message == "[coder] exit wrote current_diff, test_status"
 
 
 def test_log_node_boundaries_marks_nodes_that_write_nothing(

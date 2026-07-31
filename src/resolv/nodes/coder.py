@@ -16,7 +16,7 @@ def make_coder_node(
     backend: CoderBackend,
 ) -> Callable[[BlackboardState], dict[str, Any]]:
     def coder_node(state: BlackboardState) -> dict[str, Any]:
-        log_event(f"[coder] iteration {state.iteration + 1} started")
+        log_event("[coder] started")
         try:
             backend.generate_patch(
                 issue=state.issue,
@@ -28,7 +28,6 @@ def make_coder_node(
         diff = _capture_diff(state.workspace_path)
         return {
             "current_diff": diff,
-            "iteration": state.iteration + 1,
             "test_status": "PENDING",
             "test_output": None,
         }

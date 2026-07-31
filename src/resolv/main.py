@@ -23,7 +23,7 @@ from resolv.core.app import (
     checkpoint_database_path,
 )
 from resolv.core.graph import build_graph, sqlite_checkpointer
-from resolv.core.state import BlackboardState, IterationRecord
+from resolv.core.state import BlackboardState
 from resolv.dispatch import dispatch_issue, host_log_directory
 from resolv.exceptions import ResolvError
 from resolv.utils.run_log import log_event
@@ -51,30 +51,25 @@ def thread_id_for(owner: str, name: str, issue: int) -> str:
 
 
 def render_run_summary(final_state: dict[str, Any], verbose: bool) -> str:
-    """Render the audit trail the test_runner node accumulated in `history`.
+    """Render the run's outcome: final status and the size of what it produced.
 
     Sizes only by default: diffs and test output are unbounded, and this text is
     written to the run log. `verbose` opts in to the full content.
     """
-    history: list[IterationRecord] = final_state.get("history") or []
+    diff: str | None = final_state.get("current_diff")
+    diff_bytes = len(diff) if diff else 0
     lines = [
-        f"[summary] {len(history)} iteration(s), "
-        f"final status {final_state.get('test_status')}"
+        f"[summary] final status {final_state.get('test_status')}, "
+        f"diff {diff_bytes} bytes"
     ]
-    for record in history:
-        diff_bytes = len(record.diff) if record.diff else 0
-        lines.append(
-            f"  iteration {record.iteration}: {record.test_status}, "
-            f"diff {diff_bytes} bytes"
-        )
-        if verbose:
-            lines.extend(_indented_block("diff", record.diff))
-            lines.extend(_indented_block("test output", record.test_output))
+    if verbose:
+        lines.extend(_indented_block("diff", diff))
+        lines.extend(_indented_block("test output", final_state.get("test_output")))
     return "\n".join(lines)
 
 
 def _indented_block(label: str, content: str | None) -> list[str]:
-    """Render one labelled, indented block of an iteration's captured content."""
+    """Render one labelled, indented block of the run's captured content."""
     if not content:
         return []
     body = "\n".join(f"      {line}" for line in content.splitlines())
@@ -93,7 +88,7 @@ def run(
     verbose: bool = typer.Option(
         False,
         "--verbose",
-        help="Include each iteration's diff and test output in the run summary.",
+        help="Include the full diff and test output in the run summary.",
     ),
 ) -> None:
     """Run the pipeline in-process for a single issue (inside the sandbox container)."""
@@ -146,11 +141,11 @@ def render_state_history(snapshots: list[StateSnapshot]) -> str:
     for snapshot in snapshots:
         next_node = snapshot.next[0] if snapshot.next else "(end)"
         values = snapshot.values
+        diff = values.get("current_diff")
         lines.append(
             f"  before {next_node:<15} "
-            f"iteration={values.get('iteration', 0)} "
             f"test_status={str(values.get('test_status', '-')):<8} "
-            f"history={len(values.get('history') or [])}"
+            f"diff_bytes={len(diff) if diff else 0}"
         )
     return "\n".join(lines)
 

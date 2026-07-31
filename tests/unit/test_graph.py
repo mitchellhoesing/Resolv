@@ -11,7 +11,7 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from resolv.core.graph import _CHECKPOINT_SERDE
-from resolv.core.state import IssueRef, IterationRecord
+from resolv.core.state import IssueRef
 
 
 class _UnregisteredModel(BaseModel):
@@ -24,14 +24,11 @@ def test_checkpoint_serde_round_trips_blackboard_types() -> None:
     issue = IssueRef(
         owner="acme", repo="widgets", number=1, title="t", body="", labels=("bug",)
     )
-    record = IterationRecord(
-        iteration=1, diff="--- a\n+++ b\n", test_status="FAILED", test_output="boom"
-    )
 
-    for original in (issue, record):
-        restored = _CHECKPOINT_SERDE.loads_typed(_CHECKPOINT_SERDE.dumps_typed(original))
-        assert type(restored) is type(original)
-        assert restored == original
+    restored = _CHECKPOINT_SERDE.loads_typed(_CHECKPOINT_SERDE.dumps_typed(issue))
+
+    assert type(restored) is type(issue)
+    assert restored == issue
 
 
 def test_checkpoint_serde_allowlist_is_explicit_not_permissive() -> None:

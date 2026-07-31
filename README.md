@@ -68,10 +68,10 @@ Every node logs the state it received and the keys it wrote, and the gate logs w
 branch it took. The lines go to stdout and to `logs/<DD-MM-YYYYTHH-MM>Z.log`:
 
 ```
-[coder] enter iteration=0 test_status=PENDING diff_bytes=0 history=0
+[coder] enter test_status=PENDING diff_bytes=0
 [coder-agent] turn usage={...} tools=['mcp__resolv__run_tests']
 [coder-agent] run complete: turns=14 cost_usd=0.42 usage={...}
-[coder] exit wrote current_diff, iteration, test_output, test_status
+[coder] exit wrote current_diff, test_output, test_status
 [test_runner] 4 passed, 0 failed — status PASSED
 [gate] deliver (test PASSED)
 ```
@@ -79,14 +79,13 @@ branch it took. The lines go to stdout and to `logs/<DD-MM-YYYYTHH-MM>Z.log`:
 The coder agent runs the suite itself mid-session through `run_tests`, so several
 `[coder-agent]` turns appear before the single authoritative `[test_runner]` line.
 
-`diff_bytes` and the history count are sizes, not content — the diffs and test output
-themselves stay out of the log unless you pass `--verbose`.
+`diff_bytes` is a size, not content — the diff and test output themselves stay out of
+the log unless you pass `--verbose`.
 
-A run ends with a summary of the audit trail:
+A run ends with a one-line summary:
 
 ```
-[summary] 1 iteration(s), final status PASSED
-  iteration 1: PASSED, diff 150 bytes
+[summary] final status PASSED, diff 150 bytes
 ```
 
 A run whose suite does not pass ends at the gate with a non-zero exit code; there is
@@ -108,11 +107,11 @@ resolv inspect --repo owner/name --issue 123
 ```
 ```
 [history] 7 checkpoint(s)
-  before context_broker  iteration=0 test_status=PENDING  history=0
-  before env_installer   iteration=0 test_status=PENDING  history=0
-  before coder           iteration=0 test_status=PENDING  history=0
-  before test_runner     iteration=1 test_status=PENDING  history=0
-  before deliver         iteration=1 test_status=PASSED   history=1
+  before context_broker  test_status=PENDING  diff_bytes=0
+  before env_installer   test_status=PENDING  diff_bytes=0
+  before coder           test_status=PENDING  diff_bytes=0
+  before test_runner     test_status=PENDING  diff_bytes=150
+  before deliver         test_status=PASSED   diff_bytes=150
 ```
 
 Every intermediate state is recoverable, not just the final one — the `PENDING` row

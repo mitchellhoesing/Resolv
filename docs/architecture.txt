@@ -92,8 +92,8 @@
      core/app.py     log_node_boundaries() wraps each node at the wiring layer, so
                      the node modules themselves stay free of trace logging:
 
-                         [coder] enter iteration=0 test_status=PENDING diff_bytes=0 history=0
-                         [coder] exit wrote current_diff, iteration, test_output, test_status
+                         [coder] enter test_status=PENDING diff_bytes=0
+                         [coder] exit wrote current_diff, test_output, test_status
 
      adapters/       the agent's own turns are logged as it works, so its internal
      claude_code_    edit -> test -> fix cycle is visible without exposing prompts:
@@ -111,16 +111,15 @@
 
                          [gate] deliver (test PASSED)
 
-     main.py         render_run_summary() closes the run with the audit trail held
-                     in state.history:
+     main.py         render_run_summary() closes the run with its outcome and the
+                     size of what it produced:
 
-                         [summary] 1 iteration(s), final status PASSED
-                           iteration 1: PASSED, diff 129 bytes
+                         [summary] final status PASSED, diff 129 bytes
 
-     SIZES, NOT CONTENT. Diffs and pytest output are unbounded, and every history
-     record holds another copy of both, so the trace reports byte counts. `--verbose`
-     opts the summary in to the full content. This matters because the log is now
-     mounted onto the host rather than dying with the container.
+     SIZES, NOT CONTENT. Diffs and pytest output are unbounded, so the trace reports
+     byte counts. `--verbose` opts the summary in to the full content. This matters
+     because the log is now mounted onto the host rather than dying with the
+     container.
 
   2. STATE HISTORY (LangGraph checkpointer)
 

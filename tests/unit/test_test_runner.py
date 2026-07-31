@@ -63,7 +63,6 @@ def test_node_marks_failed_when_no_framework(state: BlackboardState) -> None:
     result = node(state)
     assert result["test_status"] == "FAILED"
     assert "no test runner detected" in result["test_output"]
-    assert len(result["history"]) == 1
     runner.assert_not_called()
 
 

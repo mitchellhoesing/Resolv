@@ -33,7 +33,7 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from resolv.core.state import BlackboardState, IssueRef, IterationRecord
+from resolv.core.state import BlackboardState, IssueRef
 from resolv.utils.run_log import log_event
 
 NodeFn = Callable[[BlackboardState], dict[str, Any]]
@@ -43,7 +43,7 @@ NodeFn = Callable[[BlackboardState], dict[str, Any]]
 # importable type and warns once per type per run; under its future default these
 # types deserialize to plain dicts instead of themselves.
 _CHECKPOINT_SERDE = JsonPlusSerializer(
-    allowed_msgpack_modules=[BlackboardState, IssueRef, IterationRecord]
+    allowed_msgpack_modules=[BlackboardState, IssueRef]
 )
 
 

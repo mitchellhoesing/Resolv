@@ -19,13 +19,9 @@ def _read_run_log(tmp_path: Path) -> str:
     )
 
 
-def _state(workspace: Path, *, iteration: int = 0, **overrides: object) -> BlackboardState:
+def _state(workspace: Path, **overrides: object) -> BlackboardState:
     issue = IssueRef(owner="a", repo="b", number=1, title="t", body="body", labels=())
-    base: dict[str, object] = {
-        "issue": issue,
-        "workspace_path": workspace,
-        "iteration": iteration,
-    }
+    base: dict[str, object] = {"issue": issue, "workspace_path": workspace}
     base.update(overrides)
     return BlackboardState(**base)
 
@@ -55,7 +51,6 @@ def test_dispatches_to_backend_and_captures_diff(repo: Path) -> None:
     node = make_coder_node(backend)
     result = node(_state(repo))
 
-    assert result["iteration"] == 1
     assert "-a = 1" in result["current_diff"]
     assert "+a = 2" in result["current_diff"]
     assert result["test_status"] == "PENDING"
@@ -81,11 +76,11 @@ def test_leaves_the_workspace_alone_before_dispatching(repo: Path) -> None:
     assert observed["stray_exists"] is True
 
 
-def test_logs_iteration_start(repo: Path) -> None:
+def test_logs_start(repo: Path) -> None:
     backend = MagicMock()
     node = make_coder_node(backend)
     node(_state(repo))
-    assert "[coder] iteration 1 started" in _read_run_log(repo)
+    assert "[coder] started" in _read_run_log(repo)
 
 
 def test_backend_error_is_logged_and_reraised(repo: Path) -> None:

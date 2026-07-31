@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from resolv.core.state import BlackboardState, IterationRecord
+from resolv.core.state import BlackboardState
 
 
 def stub_context_broker(state: BlackboardState) -> dict[str, Any]:
@@ -22,24 +22,13 @@ def stub_env_installer(state: BlackboardState) -> dict[str, Any]:
 def stub_coder(state: BlackboardState) -> dict[str, Any]:
     return {
         "current_diff": "--- a/stub\n+++ b/stub\n",
-        "iteration": state.iteration + 1,
         "test_status": "PENDING",
         "test_output": None,
     }
 
 
 def stub_test_runner(state: BlackboardState) -> dict[str, Any]:
-    record = IterationRecord(
-        iteration=state.iteration,
-        diff=state.current_diff,
-        test_status="PASSED",
-        test_output="stub: 0 passed",
-    )
-    return {
-        "test_status": "PASSED",
-        "test_output": "stub: 0 passed",
-        "history": [*state.history, record],
-    }
+    return {"test_status": "PASSED", "test_output": "stub: 0 passed"}
 
 
 def stub_deliver(state: BlackboardState) -> dict[str, Any]:

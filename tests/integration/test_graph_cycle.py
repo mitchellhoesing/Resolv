@@ -9,7 +9,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from resolv.core.graph import build_graph, sqlite_checkpointer
-from resolv.core.state import BlackboardState, IssueRef, IterationRecord
+from resolv.core.state import BlackboardState, IssueRef
 from tests.integration._stub_nodes import (
     stub_coder,
     stub_context_broker,
@@ -45,17 +45,7 @@ def _default_wiring(**overrides: Any) -> dict[str, Any]:
 
 
 def _failing_tests(state: BlackboardState) -> dict[str, Any]:
-    record = IterationRecord(
-        iteration=state.iteration,
-        diff=state.current_diff,
-        test_status="FAILED",
-        test_output="forced failure",
-    )
-    return {
-        "test_status": "FAILED",
-        "test_output": "forced failure",
-        "history": [*state.history, record],
-    }
+    return {"test_status": "FAILED", "test_output": "forced failure"}
 
 
 def test_happy_path_reaches_deliver(initial_state: BlackboardState) -> None:
@@ -63,9 +53,7 @@ def test_happy_path_reaches_deliver(initial_state: BlackboardState) -> None:
     final = app.invoke(initial_state, config=_config())
 
     assert final["test_status"] == "PASSED"
-    assert final["iteration"] == 1
-    assert len(final["history"]) == 1
-    assert final["history"][0].test_status == "PASSED"
+    assert final["test_output"] == "stub: 0 passed"
 
 
 def test_failed_tests_end_the_run_without_returning_to_coder(
@@ -76,10 +64,10 @@ def test_failed_tests_end_the_run_without_returning_to_coder(
     The coder agent runs its own edit/test cycle, so a failure here is final and
     the graph must not start a second attempt.
     """
-    coder_calls: list[int] = []
+    coder_calls: list[str] = []
 
     def counting_coder(state: BlackboardState) -> dict[str, Any]:
-        coder_calls.append(state.iteration)
+        coder_calls.append(state.test_status)
         return stub_coder(state)
 
     config = _config()
@@ -89,7 +77,7 @@ def test_failed_tests_end_the_run_without_returning_to_coder(
     final = app.invoke(initial_state, config=config)
 
     assert final["test_status"] == "FAILED"
-    assert coder_calls == [0]
+    assert coder_calls == ["PENDING"]
     executed_path = _executed_path(app, config)
     assert executed_path == ["context_broker", "env_installer", "coder", "test_runner"]
     assert "deliver" not in executed_path
@@ -134,9 +122,7 @@ def test_sqlite_checkpointer_outlives_the_graph_that_wrote_it(
         "deliver",
     ]
     # Custom types survive the database round-trip, not just plain fields.
-    final_values = snapshots[-1].values
-    assert isinstance(final_values["issue"], IssueRef)
-    assert isinstance(final_values["history"][0], IterationRecord)
+    assert isinstance(snapshots[-1].values["issue"], IssueRef)
 
 
 def test_gate_logs_the_stall_decision(
