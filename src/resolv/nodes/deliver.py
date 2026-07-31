@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
+from pathlib import PurePosixPath
 from typing import Any
 
 from git import GitCommandError, Repo
@@ -38,6 +40,11 @@ def make_deliver_node(
                 f"git operation failed for {branch_name}: {exc.stderr or exc}"
             ) from exc
 
+        body = f"Resolves #{state.issue.number}\n\n{state.issue.body or state.issue.title}"
+        edited_tests = _edited_test_paths(state.current_diff)
+        if edited_tests:
+            log_event(f"[deliver] patch modifies test files: {', '.join(edited_tests)}")
+            body = _test_edit_warning(edited_tests) + body
         try:
             pr_url = github_client.open_pull_request(
                 state.issue.owner,
@@ -45,7 +52,7 @@ def make_deliver_node(
                 head_branch=branch_name,
                 base_branch=base_branch,
                 title=commit_message,
-                body=f"Resolves #{state.issue.number}\n\n{state.issue.body or state.issue.title}",
+                body=body,
             )
         except Exception as exc:
             log_event(f"[deliver] error: {exc}")
@@ -58,3 +65,40 @@ def make_deliver_node(
         return {"test_output": f"PR opened: {pr_url}"}
 
     return deliver_node
+
+
+# The coder agent runs the suite itself, so "make the tests pass" is reachable by
+# weakening them. The authoritative re-run cannot catch that — it executes
+# against the agent's workspace, test edits included — so surface it to the
+# reviewer rather than block: a fix sometimes legitimately updates a test.
+_DIFF_TARGET_PATH = re.compile(r"^\+\+\+ b/(.+)$", re.MULTILINE)
+
+
+def _edited_test_paths(diff: str | None) -> list[str]:
+    """List the test files the diff touches, in the order they appear."""
+    if not diff:
+        return []
+    return [path for path in _DIFF_TARGET_PATH.findall(diff) if _is_test_path(path)]
+
+
+def _is_test_path(path: str) -> bool:
+    target = PurePosixPath(path)
+    if "tests" in target.parts:
+        return True
+    if target.suffix != ".py":
+        return False
+    return (
+        target.name == "conftest.py"
+        or target.name.startswith("test_")
+        or target.name.endswith("_test.py")
+    )
+
+
+def _test_edit_warning(paths: list[str]) -> str:
+    listed = "\n".join(f"> - `{path}`" for path in paths)
+    return (
+        "> [!WARNING]\n"
+        "> **This patch modifies test files.** Confirm the fix is in the source "
+        "rather than in the suite.\n"
+        f"{listed}\n\n"
+    )

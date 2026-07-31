@@ -68,6 +68,51 @@ def test_creates_branch_commits_pushes_and_opens_pr(
     assert "pr=https://github.com/acme/widgets/pull/9" in log_contents
 
 
+def test_warns_in_pr_body_when_diff_touches_tests(
+    mocker: MockerFixture, state: BlackboardState
+) -> None:
+    mocker.patch("resolv.nodes.deliver.Repo")
+    state.current_diff = (
+        "--- a/src/widgets/parse.py\n"
+        "+++ b/src/widgets/parse.py\n"
+        "@@ -1 +1 @@\n"
+        "--- a/tests/test_parse.py\n"
+        "+++ b/tests/test_parse.py\n"
+        "@@ -1 +1 @@\n"
+    )
+    github = MagicMock()
+
+    node = make_deliver_node(github_client=github)
+    node(state)
+
+    body = github.open_pull_request.call_args.kwargs["body"]
+    assert "[!WARNING]" in body
+    assert "> - `tests/test_parse.py`" in body
+    assert "src/widgets/parse.py" not in body
+    assert "Resolves #7" in body
+    assert "[deliver] patch modifies test files: tests/test_parse.py" in _read_run_log(
+        state.workspace_path
+    )
+
+
+def test_no_warning_when_diff_touches_source_only(
+    mocker: MockerFixture, state: BlackboardState
+) -> None:
+    mocker.patch("resolv.nodes.deliver.Repo")
+    state.current_diff = (
+        "--- a/src/widgets/parse.py\n+++ b/src/widgets/parse.py\n@@ -1 +1 @@\n"
+    )
+    github = MagicMock()
+
+    node = make_deliver_node(github_client=github)
+    node(state)
+
+    body = github.open_pull_request.call_args.kwargs["body"]
+    assert "[!WARNING]" not in body
+    assert body.startswith("Resolves #7")
+    assert "patch modifies test files" not in _read_run_log(state.workspace_path)
+
+
 def test_wraps_git_failure_in_delivery_error(
     mocker: MockerFixture, state: BlackboardState
 ) -> None:
