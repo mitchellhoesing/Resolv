@@ -147,9 +147,8 @@ class ClaudeCodeBackend:
         self,
         issue: IssueRef,
         workspace_path: Path,
-        prior_feedback: str | None,
     ) -> None:
-        user_prompt = render_user_prompt(issue, prior_feedback)
+        user_prompt = render_user_prompt(issue)
         # Scope the key to the SDK subprocess only; an empty key is omitted so
         # local runs can fall back to the host's logged-in Claude credentials.
         sdk_env: dict[str, str] = {}

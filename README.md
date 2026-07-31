@@ -30,7 +30,7 @@ Precedence, lowest to highest: `config/settings.toml` → `.env` → process env
 constructor kwargs.
 
 ```bash
-RESOLV_LOOP__MAX_ITERATIONS=5 RESOLV_SANDBOX__TEST_TIMEOUT_SECONDS=900 resolv run ...
+RESOLV_CODER__MAX_TURNS=90 RESOLV_SANDBOX__TEST_TIMEOUT_SECONDS=900 resolv run ...
 ```
 
 ## Run
@@ -38,7 +38,7 @@ RESOLV_LOOP__MAX_ITERATIONS=5 RESOLV_SANDBOX__TEST_TIMEOUT_SECONDS=900 resolv ru
 CLI (runs the pipeline in-process; this is what executes inside the sandbox container):
 ```bash
 resolv run --repo owner/name --issue 123
-resolv run --repo owner/name --issue 123 --verbose   # full diff + test output per iteration
+resolv run --repo owner/name --issue 123 --verbose   # full diff + test output in the summary
 resolv run --repo owner/name --issue 123 --workspace-root ./workspaces   # default: /workspace
 ```
 
@@ -68,22 +68,30 @@ Every node logs the state it received and the keys it wrote, and the gate logs w
 branch it took. The lines go to stdout and to `logs/<DD-MM-YYYYTHH-MM>Z.log`:
 
 ```
-[coder] enter iteration=1 test_status=FAILED diff_bytes=640 history=1
+[coder] enter iteration=0 test_status=PENDING diff_bytes=0 history=0
+[coder-agent] turn usage={...} tools=['mcp__resolv__run_tests']
+[coder-agent] run complete: turns=14 cost_usd=0.42 usage={...}
 [coder] exit wrote current_diff, iteration, test_output, test_status
-[test_runner] 3 passed, 1 failed — status FAILED
-[gate] loop (iteration 1/3, test FAILED)
+[test_runner] 4 passed, 0 failed — status PASSED
+[gate] deliver (test PASSED)
 ```
+
+The coder agent runs the suite itself mid-session through `run_tests`, so several
+`[coder-agent]` turns appear before the single authoritative `[test_runner]` line.
 
 `diff_bytes` and the history count are sizes, not content — the diffs and test output
 themselves stay out of the log unless you pass `--verbose`.
 
-A run ends with a summary of the per-iteration audit trail:
+A run ends with a summary of the audit trail:
 
 ```
-[summary] 2 iteration(s), final status PASSED
-  iteration 1: FAILED, diff 129 bytes
-  iteration 2: PASSED, diff 150 bytes
+[summary] 1 iteration(s), final status PASSED
+  iteration 1: PASSED, diff 150 bytes
 ```
+
+A run whose suite does not pass ends at the gate with a non-zero exit code; there is
+no retry, so read `[coder-agent] final message:` in the log to see where the agent
+stopped.
 
 `resolv dispatch` bind-mounts a per-issue host directory onto the container's log
 directory, so both the logs and the checkpoint database survive the `--rm` container:
@@ -99,17 +107,18 @@ there to be queried. Read a finished run back on the host:
 resolv inspect --repo owner/name --issue 123
 ```
 ```
-[history] 9 checkpoint(s)
+[history] 7 checkpoint(s)
+  before context_broker  iteration=0 test_status=PENDING  history=0
+  before env_installer   iteration=0 test_status=PENDING  history=0
   before coder           iteration=0 test_status=PENDING  history=0
   before test_runner     iteration=1 test_status=PENDING  history=0
-  before coder           iteration=1 test_status=FAILED   history=1
-  before test_runner     iteration=2 test_status=PENDING  history=1
-  before deliver         iteration=2 test_status=PASSED   history=2
+  before deliver         iteration=1 test_status=PASSED   history=1
 ```
 
-Note the second `coder` line: the failed first attempt is still recoverable even
-though the run finished `PASSED`. This needs no credentials — it reads the database
-directly. Pass `--database <path>` to point at one explicitly.
+Every intermediate state is recoverable, not just the final one — the `PENDING` row
+above is the workspace as the coder left it, before the suite was judged. This needs
+no credentials — it reads the database directly. Pass `--database <path>` to point at
+one explicitly.
 
 In Python, `graph.get_state(config)` and `graph.get_state_history(config)` give the
 same data as objects, keyed by a `thread_id` (`resolv.main.thread_id_for` builds one

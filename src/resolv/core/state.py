@@ -1,4 +1,4 @@
-"""Strongly-typed Pydantic V2 Blackboard state for the LangGraph loop."""
+"""Strongly-typed Pydantic V2 Blackboard state for the LangGraph pipeline."""
 
 from __future__ import annotations
 

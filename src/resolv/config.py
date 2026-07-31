@@ -29,10 +29,6 @@ class CoderSettings(BaseModel):
     max_turns: int = Field(default=60, ge=1)
 
 
-class LoopSettings(BaseModel):
-    max_iterations: int = Field(default=3, ge=1, le=20)
-
-
 class DeliverySettings(BaseModel):
     base_branch: str = "main"
     branch_prefix: str = "resolv/issue-"
@@ -52,7 +48,6 @@ class WebhookSettings(BaseModel):
 
 class Settings(BaseSettings):
     coder: CoderSettings = CoderSettings()
-    loop: LoopSettings = LoopSettings()
     delivery: DeliverySettings = DeliverySettings()
     sandbox: SandboxSettings = SandboxSettings()
     webhook: WebhookSettings = WebhookSettings()

@@ -1,9 +1,8 @@
 """Env Installer node — installs the target repo's dev/test dependencies.
 
-Runs once, after the clone and before the coder/test loop. Dependencies are
-installed into a per-repo venv that lives NEXT TO the workspace, never inside
-it: the coder's retry cleanup (`git clean -fdx`) and deliver's `git add -A`
-must never see it. The install needs network access (package indexes), so it
+Runs once, after the clone and before the coder. Dependencies are installed
+into a per-repo venv that lives NEXT TO the workspace, never inside it, so
+deliver's `git add -A` cannot sweep it into the PR. The install needs network access (package indexes), so it
 runs via `run_networked` — untrusted build hooks are contained by the scrubbed
 environment rather than a network namespace.
 

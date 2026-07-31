@@ -51,7 +51,7 @@ def thread_id_for(owner: str, name: str, issue: int) -> str:
 
 
 def render_run_summary(final_state: dict[str, Any], verbose: bool) -> str:
-    """Render the per-iteration audit trail the loop accumulated in `history`.
+    """Render the audit trail the test_runner node accumulated in `history`.
 
     Sizes only by default: diffs and test output are unbounded, and this text is
     written to the run log. `verbose` opts in to the full content.
@@ -124,9 +124,11 @@ def run(
     if final_state.get("test_status") == "PASSED":
         typer.echo(final_state.get("test_output") or "PR opened")
         raise typer.Exit(0)
+    # There is no retry: the coder agent already ran its own edit/test cycle, so
+    # a non-PASSED verdict here is a handoff to a human.
     typer.echo(
-        f"Loop did not converge after {final_state.get('iteration', 0)} iterations "
-        f"(test={final_state.get('test_status')})",
+        f"Coder agent did not reach a passing suite (test={final_state.get('test_status')}); "
+        "see the run log for the agent's final message",
         err=True,
     )
     raise typer.Exit(1)
@@ -136,7 +138,7 @@ def render_state_history(snapshots: list[StateSnapshot]) -> str:
     """Render one line per node boundary, oldest first.
 
     Each snapshot's `next` names the node that was about to run, so the sequence
-    traces the executed path — including iterations the final state overwrote.
+    traces the executed path — including state the final result overwrote.
     """
     if not snapshots:
         return "[history] no checkpoints recorded"
@@ -184,8 +186,6 @@ def _read_state_history(database: Path, thread_id: str) -> list[StateSnapshot]:
         coder_fn=placeholder,
         test_runner_fn=placeholder,
         deliver_fn=placeholder,
-        # Never invoked — the gate is unreachable, so any valid bound works.
-        max_iterations=1,
         checkpointer=sqlite_checkpointer(database),
     )
     config: RunnableConfig = {"configurable": {"thread_id": thread_id}}

@@ -13,7 +13,7 @@ Every node below is wrapped by `log_node_boundaries` (core/app.py) at the produc
 ---
 
 * **Node 2 — Env Installer (nodes/env_installer.py)**
-* **Job:** install the target repo's dev/test dependencies into a per-repo venv so any Python repo's suite can run. Runs once, before the coder/test loop.
+* **Job:** install the target repo's dev/test dependencies into a per-repo venv so any Python repo's suite can run. Runs once, before the coder.
 * **1.** Venv convention (venv_path_for) — the venv lives NEXT TO the workspace (`<workspace>__venv`), never inside it: the coder's `git clean -fdx` and deliver's `git add -A` must never see it. pytest is seeded into it before the target deps, so the venv's pytest always sees venv site-packages while a repo's own pin wins.
 * **2.** Detect the install plan (detect_install_plan) — manager tier, exclusive first match: poetry.lock / [tool.poetry] → `poetry install --no-interaction` (redirected into our venv via POETRY_VIRTUALENVS_CREATE=false); uv.lock → `uv sync --frozen` (UV_PROJECT_ENVIRONMENT); Pipfile.lock → `pipenv sync --dev`; Pipfile → `pipenv install --dev`. Managers are never translated to pip (pip would drop their dev/test groups). Fallthrough pip tier is additive: `-e .[dev,test,...]` (extras intersected with dev/test/tests/testing) plus every requirements file (`requirements*.txt`, `requirements/*.txt`), combined into one pip command. No manifests → proceed with a log note (stdlib-only repos are valid).
 * **3.** Run networked (run_networked, sandbox.py) — installs execute untrusted build hooks and must reach package indexes, so no netns is applied; the scrubbed env (no secrets, no RESOLV_*) is the control. Timeout: sandbox.install_timeout_seconds (default 900s).
@@ -26,10 +26,9 @@ Every node below is wrapped by `log_node_boundaries` (core/app.py) at the produc
 
 * **Node 3 — Coder (nodes/coder.py)**
 * **Job:** mutate the workspace in place to attempt a fix, then capture the diff.
-* **1.** Reset on retry — on iteration > 0, `_reset_workspace` runs `git reset --hard` + `git clean -fdx`, throwing away the previous failed attempt. Each attempt starts from a clean tree — attempts don't stack.
-* **2.** Compose feedback (`_compose_feedback`) — on retries, builds a prompt block from history: every prior attempt's diff (capped at 2000 chars) and (if FAILED) its test output, prefixed with "these failed, don't repeat them." This is how the loop learns.
-* **3.** Dispatch to the backend — calls `backend.generate_patch(...)`. The backend is a Protocol (adapters/coder.py) implemented by `ClaudeCodeBackend` (Claude Agent SDK). The prompt is built by `render_user_prompt`, which lays out the issue and any prior feedback. The backend edits files directly; it returns nothing.
-* **4.** Capture the diff (`_capture_diff`) — `git diff HEAD`.
+* **1.** Dispatch to the backend — calls `backend.generate_patch(...)`. The backend is a Protocol (adapters/coder.py) implemented by `ClaudeCodeBackend` (Claude Agent SDK). The prompt is built by `render_user_prompt`, which lays out the issue. The backend edits files directly; it returns nothing.
+* **2.** The backend runs its own edit → test → fix cycle inside one agent session: `run_tests` is registered as an in-process SDK MCP tool (`mcp__resolv__run_tests`) that executes the suite through the same sandboxed path the test_runner node uses. `Bash` is deliberately not granted, so untrusted repo code never runs in the SDK subprocess, whose env carries the API key. `coder.max_turns` (default 60) is the only ceiling on the session. The node itself does not retry — there is one coder invocation per run.
+* **3.** Capture the diff (`_capture_diff`) — `git diff HEAD`.
 * **Returns:** {current_diff, iteration+1, test_status: "PENDING", test_output: None} — resetting status for the test runner.
 
 
@@ -43,7 +42,7 @@ Every node below is wrapped by `log_node_boundaries` (core/app.py) at the produc
 * **3.** Judge — exit code 0 → PASSED, else FAILED. Output is stdout+stderr tail-capped at 10k chars, and the log line carries parsed passed/failed counts when the summary is recognizable (`_format_test_summary`).
 * **4.** Record (`_record_and_return`) — appends an `IterationRecord` to history.
 * **Returns:** {test_status, test_output, history}.
-* **Then the gate (core/graph.py) routes on the result:** PASSED → deliver; iteration >= max → END (stall); otherwise → back to coder with the new feedback. The chosen branch is logged as `[gate] loop|stall|deliver (iteration N/max, test STATUS)`.
+* **Then the gate (core/graph.py) routes on the result:** PASSED → deliver; anything else → END (stall), and `resolv run` exits non-zero for a human to triage. There is no route back to the coder. The chosen branch is logged as `[gate] stall|deliver (test STATUS)`. This node's verdict is the authoritative one — the agent's own `run_tests` calls are feedback for itself and are never trusted as the result.
 
 
 
@@ -52,5 +51,5 @@ Every node below is wrapped by `log_node_boundaries` (core/app.py) at the produc
 * **Node 5 — Deliver (nodes/deliver.py)**
 * **Job:** ship the verified fix. Only reached when tests passed.
 * **1.** Branch + commit + push — via GitPython: create `resolv/issue-<number>`, check out, `add -A`, commit `fix: resolve issue #<number> — <title>`, push to origin. Git failures → `DeliveryError`.
-* **2.** Open the PR — `github_client.open_pull_request(...)` against `base_branch` (default `main`), body `Resolves #<number>` plus the issue text.
+* **2.** Open the PR — `github_client.open_pull_request(...)` against `base_branch` (default `main`), body `Resolves #<number>` plus the issue text. When the captured diff touches test files, a warning block naming them is prepended so the reviewer confirms the fix is in the source rather than in the suite; nothing is blocked.
 * **Returns:** `{"test_output": "PR opened: <url>"}` — which `main.py` reads to decide its exit code, after it has logged the run summary built from `history`.

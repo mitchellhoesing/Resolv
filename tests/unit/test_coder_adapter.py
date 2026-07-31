@@ -30,22 +30,19 @@ def test_claude_code_backend_satisfies_protocol() -> None:
     assert isinstance(_backend(), CoderBackend)
 
 
-def test_render_user_prompt_includes_issue_and_feedback() -> None:
+def test_render_user_prompt_includes_the_issue() -> None:
     issue = IssueRef(
         owner="a", repo="b", number=7, title="Boom", body="repro steps", labels=("bug",)
     )
-    prompt = render_user_prompt(issue, prior_feedback="prior attempt missed line 4")
+    prompt = render_user_prompt(issue)
 
     assert "Issue #7: Boom" in prompt
     assert "repro steps" in prompt
-    assert "prior attempt missed line 4" in prompt
 
 
-def test_render_user_prompt_handles_empty_body_and_feedback() -> None:
+def test_render_user_prompt_handles_empty_body() -> None:
     issue = IssueRef(owner="a", repo="b", number=1, title="t", body="", labels=())
-    prompt = render_user_prompt(issue, None)
-    assert "(no body provided)" in prompt
-    assert "Prior attempt feedback" not in prompt
+    assert "(no body provided)" in render_user_prompt(issue)
 
 
 def test_generate_patch_logs_token_usage_not_prompt(
@@ -82,7 +79,7 @@ def test_generate_patch_logs_token_usage_not_prompt(
     issue = IssueRef(
         owner="a", repo="b", number=7, title="Boom", body="repro steps", labels=()
     )
-    _backend().generate_patch(issue=issue, workspace_path=tmp_path, prior_feedback=None)
+    _backend().generate_patch(issue=issue, workspace_path=tmp_path)
 
     log_contents = "\n".join(
         log_file.read_text(encoding="utf-8")

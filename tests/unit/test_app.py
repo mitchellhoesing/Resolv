@@ -42,10 +42,8 @@ def test_build_production_graph_wires_all_nodes(mocker: MockerFixture) -> None:
         "coder_fn",
         "test_runner_fn",
         "deliver_fn",
-        "max_iterations",
         "checkpointer",
     }
-    assert kwargs["max_iterations"] == settings.loop.max_iterations
     # Production checkpoints to disk so a finished run stays queryable.
     assert isinstance(kwargs["checkpointer"], SqliteSaver)
     assert checkpoint_database_path().is_file()

@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from resolv.core.state import BlackboardState, IssueRef, IterationRecord
+from resolv.core.state import BlackboardState, IssueRef
 from resolv.nodes.coder import make_coder_node
 
 
@@ -45,7 +45,7 @@ def repo(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def test_first_iteration_skips_reset_and_captures_diff(repo: Path) -> None:
+def test_dispatches_to_backend_and_captures_diff(repo: Path) -> None:
     def backend_writes_change(**kwargs: object) -> None:
         (repo / "f.py").write_text("a = 2\n")
 
@@ -59,55 +59,26 @@ def test_first_iteration_skips_reset_and_captures_diff(repo: Path) -> None:
     assert "-a = 1" in result["current_diff"]
     assert "+a = 2" in result["current_diff"]
     assert result["test_status"] == "PENDING"
-    backend.generate_patch.assert_called_once()
-    kwargs = backend.generate_patch.call_args.kwargs
-    assert kwargs["prior_feedback"] is None
-
-
-def test_subsequent_iteration_resets_workspace_and_passes_feedback(repo: Path) -> None:
-    (repo / "stray.txt").write_text("uncommitted")
-    captured: dict[str, object] = {}
-
-    def capture(**kwargs: object) -> None:
-        captured.update(kwargs)
-        captured["stray_exists"] = (repo / "stray.txt").exists()
-        (repo / "f.py").write_text("a = 3\n")
-
-    backend = MagicMock()
-    backend.generate_patch.side_effect = capture
-
-    prior_attempt = IterationRecord(
-        iteration=1,
-        diff="--- a/f.py\n+++ b/f.py\n@@\n-a = 1\n+a = 99\n",
-        test_status="FAILED",
-        test_output="3 failed",
+    backend.generate_patch.assert_called_once_with(
+        issue=_state(repo).issue, workspace_path=repo
     )
-    state = _state(repo, iteration=1, history=[prior_attempt])
-    node = make_coder_node(backend)
-    result = node(state)
-
-    assert captured["stray_exists"] is False  # workspace was cleaned
-    feedback = captured["prior_feedback"]
-    assert isinstance(feedback, str)
-    assert "previous attempts" in feedback  # labeled as past attempts
-    assert "3 failed" in feedback
-    assert "+a = 99" in feedback  # the prior diff is shown so it is not repeated
-    assert result["iteration"] == 2
-    assert "+a = 3" in result["current_diff"]
 
 
-def test_iteration_without_feedback_passes_none(repo: Path) -> None:
-    captured: dict[str, object] = {}
+def test_leaves_the_workspace_alone_before_dispatching(repo: Path) -> None:
+    """The node must not reset: there is no prior attempt to discard."""
+    (repo / "stray.txt").write_text("uncommitted")
+    observed: dict[str, object] = {}
 
     def capture(**kwargs: object) -> None:
-        captured.update(kwargs)
+        observed["stray_exists"] = (repo / "stray.txt").exists()
 
     backend = MagicMock()
     backend.generate_patch.side_effect = capture
 
     node = make_coder_node(backend)
-    node(_state(repo, iteration=1, test_status="PASSED", test_output=None))
-    assert captured["prior_feedback"] is None
+    node(_state(repo))
+
+    assert observed["stray_exists"] is True
 
 
 def test_logs_iteration_start(repo: Path) -> None:

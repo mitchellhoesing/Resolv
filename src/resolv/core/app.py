@@ -85,6 +85,5 @@ def build_production_graph(settings: Settings | None = None) -> CompiledStateGra
                 branch_prefix=settings.delivery.branch_prefix,
             ),
         ),
-        max_iterations=settings.loop.max_iterations,
         checkpointer=sqlite_checkpointer(checkpoint_database_path()),
     )

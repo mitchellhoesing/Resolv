@@ -4,8 +4,11 @@ The graph wires:
 
     START -> context_broker -> env_installer -> coder -> test_runner -> gate
     gate -> deliver -> END                          (tests PASSED)
-    gate -> coder                                   (loop with feedback, iteration < max)
-    gate -> END                                     (stall — caller reports non-convergence)
+    gate -> END                                     (stall — caller reports the failure)
+
+The coder agent runs its own edit -> test -> fix cycle in one session, so the
+graph is acyclic: a FAILED verdict ends the run for a human to triage rather
+than starting another attempt.
 
 Node functions are required arguments so tests can wire stubs and the
 production builder (`resolv.core.app.build_production_graph`) wires real
@@ -62,25 +65,14 @@ def sqlite_checkpointer(database_path: Path) -> SqliteSaver:
 
 
 GATE_DELIVER = "deliver"
-GATE_LOOP = "loop"
 GATE_STALL = "stall"
 
 
-def _make_gate_router(max_iterations: int) -> Callable[[BlackboardState], str]:
-    def gate_router(state: BlackboardState) -> str:
-        if state.test_status == "PASSED":
-            decision = GATE_DELIVER
-        elif state.iteration >= max_iterations:
-            decision = GATE_STALL
-        else:
-            decision = GATE_LOOP
-        log_event(
-            f"[gate] {decision} (iteration {state.iteration}/{max_iterations}, "
-            f"test {state.test_status})"
-        )
-        return decision
-
-    return gate_router
+def gate_router(state: BlackboardState) -> str:
+    """Route on the authoritative verdict: deliver on PASSED, otherwise stall."""
+    decision = GATE_DELIVER if state.test_status == "PASSED" else GATE_STALL
+    log_event(f"[gate] {decision} (test {state.test_status})")
+    return decision
 
 
 def build_graph(
@@ -90,7 +82,6 @@ def build_graph(
     coder_fn: NodeFn,
     test_runner_fn: NodeFn,
     deliver_fn: NodeFn,
-    max_iterations: int,
     checkpointer: BaseCheckpointSaver[Any] | None = None,
 ) -> CompiledStateGraph:
     graph: StateGraph = StateGraph(BlackboardState)
@@ -110,10 +101,9 @@ def build_graph(
     graph.add_edge("coder", "test_runner")
     graph.add_conditional_edges(
         "test_runner",
-        _make_gate_router(max_iterations),
+        gate_router,
         {
             GATE_DELIVER: "deliver",
-            GATE_LOOP: "coder",
             GATE_STALL: END,
         },
     )

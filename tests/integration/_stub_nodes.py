@@ -1,6 +1,6 @@
 """Stub node implementations for graph-topology tests.
 
-These keep the LangGraph cycle tests independent of Docker, network, and
+These keep the LangGraph topology tests independent of Docker, network, and
 git; production wiring lives in `resolv.core.app.build_production_graph`.
 """
 

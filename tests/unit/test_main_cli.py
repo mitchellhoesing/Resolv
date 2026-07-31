@@ -80,7 +80,7 @@ def test_cli_stall_path_exits_nonzero(mocker: MockerFixture) -> None:
 
     result = runner.invoke(app, ["run", "--repo", "a/b", "--issue", "1"])
     assert result.exit_code == 1
-    assert "did not converge" in result.output
+    assert "Coder agent did not reach a passing suite" in result.output
 
 
 def test_render_run_summary_reports_sizes_by_default() -> None:
@@ -135,7 +135,7 @@ def test_cli_prints_run_summary_on_the_stall_path(mocker: MockerFixture) -> None
     assert result.exit_code == 1
     assert "[summary] 2 iteration(s), final status FAILED" in result.output
     assert "  iteration 1: FAILED, diff 16 bytes" in result.output
-    assert "did not converge" in result.output
+    assert "Coder agent did not reach a passing suite" in result.output
 
 
 def test_cli_verbose_flag_expands_the_summary(mocker: MockerFixture) -> None:
@@ -179,7 +179,6 @@ def _write_checkpoint_database(destination: Path) -> None:
         coder_fn=stub_coder,
         test_runner_fn=stub_test_runner,
         deliver_fn=stub_deliver,
-        max_iterations=1,
         checkpointer=sqlite_checkpointer(destination),
     )
     issue = IssueRef(owner="a", repo="b", number=1, title="t", body="", labels=())

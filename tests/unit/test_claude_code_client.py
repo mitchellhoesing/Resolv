@@ -108,7 +108,7 @@ def test_backend_invokes_client_with_workspace(
     fake_run.kwargs = {}
     fake_client.run = fake_run
 
-    _backend(fake_client).generate_patch(issue, tmp_path, None)
+    _backend(fake_client).generate_patch(issue, tmp_path)
 
     assert fake_run.kwargs["cwd"] == tmp_path
     assert fake_run.kwargs["model"] == "claude-opus-4-7"
@@ -129,7 +129,7 @@ def test_backend_scopes_api_key_to_sdk_env(
     fake_client.run = fake_run
 
     backend = _backend(fake_client, anthropic_api_key=SecretStr("sk-ant-test"))
-    backend.generate_patch(issue, tmp_path, None)
+    backend.generate_patch(issue, tmp_path)
 
     assert fake_run.kwargs["env"] == {"ANTHROPIC_API_KEY": "sk-ant-test"}
 
@@ -147,7 +147,7 @@ def test_backend_omits_env_for_empty_api_key(
     fake_client.run = fake_run
 
     backend = _backend(fake_client, anthropic_api_key=SecretStr(""))
-    backend.generate_patch(issue, tmp_path, None)
+    backend.generate_patch(issue, tmp_path)
 
     assert fake_run.kwargs["env"] is None
 
@@ -163,7 +163,7 @@ def test_backend_wraps_sdk_errors_in_coder_error(
     fake_client.run = boom
 
     with pytest.raises(CoderError, match="sdk crash"):
-        _backend(fake_client).generate_patch(issue, tmp_path, None)
+        _backend(fake_client).generate_patch(issue, tmp_path)
 
 
 def test_run_tests_tool_delegates_to_injected_run_suite(tmp_path: Path) -> None:
@@ -198,7 +198,7 @@ def test_backend_registers_run_tests_server_and_authorizes_it(
     fake_run.kwargs = {}
     fake_client.run = fake_run
 
-    _backend(fake_client).generate_patch(issue, tmp_path, None)
+    _backend(fake_client).generate_patch(issue, tmp_path)
 
     # The agent can only call the tool if the server is registered *and* the
     # namespaced name is allowed; the bare name would not authorize it.
@@ -216,7 +216,7 @@ def test_backend_passes_max_turns_to_client(tmp_path: Path, issue: IssueRef) -> 
     fake_run.kwargs = {}
     fake_client.run = fake_run
 
-    _backend(fake_client, max_turns=12).generate_patch(issue, tmp_path, None)
+    _backend(fake_client, max_turns=12).generate_patch(issue, tmp_path)
 
     # With no retry loop this is the only ceiling on one coder invocation.
     assert fake_run.kwargs["max_turns"] == 12
