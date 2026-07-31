@@ -16,7 +16,7 @@ from resolv.core.graph import NodeFn, build_graph, sqlite_checkpointer
 from resolv.core.state import BlackboardState
 from resolv.nodes.coder import make_coder_node
 from resolv.nodes.context_broker import make_context_broker_node
-from resolv.nodes.deliver import make_deliver_node
+from resolv.nodes.deliver import make_deliver_node, make_dry_run_deliver_node
 from resolv.nodes.env_installer import make_env_installer_node
 from resolv.nodes.test_runner import agent_test_report, make_test_runner_node
 from resolv.utils.run_log import log_directory, log_event
@@ -49,7 +49,9 @@ def log_node_boundaries(node_name: str, node_fn: NodeFn) -> NodeFn:
     return logged_node
 
 
-def build_production_graph(settings: Settings | None = None) -> CompiledStateGraph:
+def build_production_graph(
+    settings: Settings | None = None, *, dry_run: bool = False
+) -> CompiledStateGraph:
     settings = settings or get_settings()
     # The coder agent runs the suite itself through the same sandboxed path the
     # test_runner node uses; wiring it here keeps `adapters` free of any import
@@ -64,6 +66,19 @@ def build_production_graph(settings: Settings | None = None) -> CompiledStateGra
         anthropic_api_key=settings.anthropic_api_key,
     )
     github_client = GitHubClient(settings.github_token)
+
+    # dry_run swaps the delivery stage for a stub that logs the would-have-pushed
+    # decision but never touches git or GitHub. The graph topology is unchanged so
+    # the same gate still routes PASSED runs through `deliver`, and the run's diff
+    # and test output remain on the Blackboard for the CLI to print.
+    if dry_run:
+        deliver_node: NodeFn = make_dry_run_deliver_node()
+    else:
+        deliver_node = make_deliver_node(
+            github_client=github_client,
+            base_branch=settings.delivery.base_branch,
+            branch_prefix=settings.delivery.branch_prefix,
+        )
 
     return build_graph(
         context_broker_fn=log_node_boundaries(
@@ -81,13 +96,6 @@ def build_production_graph(settings: Settings | None = None) -> CompiledStateGra
             "test_runner",
             make_test_runner_node(timeout=settings.sandbox.test_timeout_seconds),
         ),
-        deliver_fn=log_node_boundaries(
-            "deliver",
-            make_deliver_node(
-                github_client=github_client,
-                base_branch=settings.delivery.base_branch,
-                branch_prefix=settings.delivery.branch_prefix,
-            ),
-        ),
+        deliver_fn=log_node_boundaries("deliver", deliver_node),
         checkpointer=sqlite_checkpointer(checkpoint_database_path()),
     )

@@ -163,6 +163,70 @@ def test_cli_verbose_flag_expands_the_summary(mocker: MockerFixture) -> None:
     assert "      --- a/x" in loud.output
 
 
+def test_cli_dry_run_flag_is_forwarded_to_graph_builder(
+    mocker: MockerFixture,
+) -> None:
+    """`--dry-run` must reach `build_production_graph` — that is what disables the push."""
+    settings = _stub_settings()
+    mocker.patch("resolv.main.get_settings", return_value=settings)
+    github = MagicMock()
+    github.fetch_issue.return_value = IssueRef(
+        owner="a", repo="b", number=1, title="t", body="", labels=()
+    )
+    mocker.patch("resolv.main.GitHubClient", return_value=github)
+    graph = MagicMock()
+    graph.invoke.return_value = _finished_run()
+    builder = mocker.patch("resolv.main.build_production_graph", return_value=graph)
+
+    result = runner.invoke(
+        app, ["run", "--repo", "a/b", "--issue", "1", "--dry-run"]
+    )
+
+    assert result.exit_code == 0
+    builder.assert_called_once_with(settings, dry_run=True)
+
+
+def test_cli_dry_run_defaults_off(mocker: MockerFixture) -> None:
+    """Absent the flag, the graph is built for a real delivery."""
+    settings = _stub_settings()
+    mocker.patch("resolv.main.get_settings", return_value=settings)
+    github = MagicMock()
+    github.fetch_issue.return_value = IssueRef(
+        owner="a", repo="b", number=1, title="t", body="", labels=()
+    )
+    mocker.patch("resolv.main.GitHubClient", return_value=github)
+    graph = MagicMock()
+    graph.invoke.return_value = _finished_run()
+    builder = mocker.patch("resolv.main.build_production_graph", return_value=graph)
+
+    result = runner.invoke(app, ["run", "--repo", "a/b", "--issue", "1"])
+
+    assert result.exit_code == 0
+    builder.assert_called_once_with(settings, dry_run=False)
+
+
+def test_cli_dry_run_forces_the_verbose_summary(mocker: MockerFixture) -> None:
+    """Reviewing the diff before granting write access is the whole point of the flag."""
+    mocker.patch("resolv.main.get_settings", return_value=_stub_settings())
+    github = MagicMock()
+    github.fetch_issue.return_value = IssueRef(
+        owner="a", repo="b", number=1, title="t", body="", labels=()
+    )
+    mocker.patch("resolv.main.GitHubClient", return_value=github)
+    graph = MagicMock()
+    graph.invoke.return_value = _finished_run()
+    mocker.patch("resolv.main.build_production_graph", return_value=graph)
+
+    result = runner.invoke(
+        app, ["run", "--repo", "a/b", "--issue", "1", "--dry-run"]
+    )
+
+    assert result.exit_code == 0
+    assert "    diff:" in result.output
+    assert "      --- a/x" in result.output
+    assert "    test output:" in result.output
+
+
 def _write_checkpoint_database(destination: Path, thread_id: str = "a/b#1@RUN-1") -> None:
     """Run a stub graph against a real database so `inspect` has something to read."""
     from tests.integration._stub_nodes import (

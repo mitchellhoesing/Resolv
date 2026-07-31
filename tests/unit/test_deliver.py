@@ -11,7 +11,7 @@ from pytest_mock import MockerFixture
 
 from resolv.core.state import BlackboardState, IssueRef
 from resolv.exceptions import DeliveryError
-from resolv.nodes.deliver import make_deliver_node
+from resolv.nodes.deliver import make_deliver_node, make_dry_run_deliver_node
 
 
 def _read_run_log(tmp_path: Path) -> str:
@@ -127,3 +127,43 @@ def test_wraps_git_failure_in_delivery_error(
         node(state)
     github.open_pull_request.assert_not_called()
     assert "[deliver] error: git operation failed" in _read_run_log(state.workspace_path)
+
+
+def test_dry_run_deliver_node_does_not_touch_git_or_github(
+    mocker: MockerFixture, state: BlackboardState
+) -> None:
+    """The dry-run replacement must never construct a Repo or reach GitHub."""
+    fake_repo_cls = mocker.patch("resolv.nodes.deliver.Repo")
+    state.current_diff = (
+        "diff --git a/src/x.py b/src/x.py\n"
+        "--- a/src/x.py\n+++ b/src/x.py\n@@ -1 +1 @@\n-old\n+new\n"
+    )
+
+    node = make_dry_run_deliver_node()
+    result = node(state)
+
+    fake_repo_cls.assert_not_called()
+    assert "dry-run: no PR opened for issue #7" in result["test_output"]
+    log_contents = _read_run_log(state.workspace_path)
+    assert "[deliver] dry-run: would open PR for issue #7" in log_contents
+    assert "acme/widgets" in log_contents
+    assert "wrote +1/-1 lines across 1 file(s)" in log_contents
+
+
+def test_dry_run_deliver_node_still_flags_test_edits(
+    mocker: MockerFixture, state: BlackboardState
+) -> None:
+    """The reviewer signal for test edits is exactly what dry-run is meant to expose."""
+    mocker.patch("resolv.nodes.deliver.Repo")
+    state.current_diff = (
+        "--- a/src/widgets/parse.py\n+++ b/src/widgets/parse.py\n@@ -1 +1 @@\n"
+        "--- a/tests/test_parse.py\n+++ b/tests/test_parse.py\n@@ -1 +1 @@\n"
+    )
+
+    node = make_dry_run_deliver_node()
+    node(state)
+
+    log_contents = _read_run_log(state.workspace_path)
+    assert (
+        "[deliver] patch modifies test files: tests/test_parse.py" in log_contents
+    )

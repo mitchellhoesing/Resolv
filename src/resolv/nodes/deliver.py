@@ -12,6 +12,7 @@ from git import GitCommandError, Repo
 from resolv.adapters.github_client import GitHubClient
 from resolv.core.state import BlackboardState
 from resolv.exceptions import DeliveryError
+from resolv.utils.diff_stats import describe_diff
 from resolv.utils.run_log import log_event
 
 
@@ -104,3 +105,36 @@ def _test_edit_warning(paths: list[str]) -> str:
         "rather than in the suite.\n"
         f"{listed}\n\n"
     )
+
+
+def make_dry_run_deliver_node() -> Callable[[BlackboardState], dict[str, Any]]:
+    """Deliver-shaped node that logs what it *would* have pushed but never does.
+
+    Runs in place of the real deliver node when the CLI's `--dry-run` flag is
+    set: the gate still routes to `deliver` on PASSED, so the pipeline exercises
+    the same edges, but no branch is created, nothing is pushed, and no PR is
+    opened. The diff and test output are already captured on the Blackboard and
+    the CLI prints them from the final state; this node only records the
+    would-have-pushed decision to the run log for the audit trail, mirroring
+    the same test-edit warning the real node surfaces to reviewers.
+    """
+
+    def dry_run_deliver_node(state: BlackboardState) -> dict[str, Any]:
+        log_event(
+            f"[deliver] dry-run: would open PR for issue #{state.issue.number} "
+            f"in {state.issue.owner}/{state.issue.repo} "
+            f"({describe_diff(state.current_diff)})"
+        )
+        edited_tests = _edited_test_paths(state.current_diff)
+        if edited_tests:
+            log_event(
+                f"[deliver] patch modifies test files: {', '.join(edited_tests)}"
+            )
+        return {
+            "test_output": (
+                f"dry-run: no PR opened for issue #{state.issue.number}; "
+                "see the run summary for the diff and sandbox test output"
+            )
+        }
+
+    return dry_run_deliver_node
