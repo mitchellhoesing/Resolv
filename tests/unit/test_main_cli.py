@@ -143,6 +143,64 @@ def test_cli_prints_run_summary_on_the_stall_path(mocker: MockerFixture) -> None
     assert "Coder agent did not reach a passing suite" in result.output
 
 
+def test_cli_dry_run_passes_flag_to_the_graph_builder(mocker: MockerFixture) -> None:
+    """--dry-run must reach `build_production_graph`; otherwise deliver still ships."""
+    mocker.patch("resolv.main.get_settings", return_value=_stub_settings())
+    github = MagicMock()
+    github.fetch_issue.return_value = IssueRef(
+        owner="a", repo="b", number=1, title="t", body="", labels=()
+    )
+    mocker.patch("resolv.main.GitHubClient", return_value=github)
+    graph = MagicMock()
+    graph.invoke.return_value = _finished_run()
+    build = mocker.patch("resolv.main.build_production_graph", return_value=graph)
+
+    result = runner.invoke(
+        app, ["run", "--repo", "a/b", "--issue", "1", "--dry-run"]
+    )
+
+    assert result.exit_code == 0
+    assert build.call_args.kwargs["dry_run"] is True
+
+
+def test_cli_dry_run_forces_the_verbose_summary(mocker: MockerFixture) -> None:
+    """The whole point of dry-run is seeing what would ship — no --verbose needed."""
+    mocker.patch("resolv.main.get_settings", return_value=_stub_settings())
+    github = MagicMock()
+    github.fetch_issue.return_value = IssueRef(
+        owner="a", repo="b", number=1, title="t", body="", labels=()
+    )
+    mocker.patch("resolv.main.GitHubClient", return_value=github)
+    graph = MagicMock()
+    graph.invoke.return_value = _finished_run()
+    mocker.patch("resolv.main.build_production_graph", return_value=graph)
+
+    result = runner.invoke(
+        app, ["run", "--repo", "a/b", "--issue", "1", "--dry-run"]
+    )
+
+    assert result.exit_code == 0
+    assert "    diff:" in result.output
+    assert "      --- a/x" in result.output
+
+
+def test_cli_run_defaults_dry_run_off(mocker: MockerFixture) -> None:
+    mocker.patch("resolv.main.get_settings", return_value=_stub_settings())
+    github = MagicMock()
+    github.fetch_issue.return_value = IssueRef(
+        owner="a", repo="b", number=1, title="t", body="", labels=()
+    )
+    mocker.patch("resolv.main.GitHubClient", return_value=github)
+    graph = MagicMock()
+    graph.invoke.return_value = _finished_run()
+    build = mocker.patch("resolv.main.build_production_graph", return_value=graph)
+
+    result = runner.invoke(app, ["run", "--repo", "a/b", "--issue", "1"])
+
+    assert result.exit_code == 0
+    assert build.call_args.kwargs["dry_run"] is False
+
+
 def test_cli_verbose_flag_expands_the_summary(mocker: MockerFixture) -> None:
     mocker.patch("resolv.main.get_settings", return_value=_stub_settings())
     github = MagicMock()
@@ -348,7 +406,22 @@ def test_cli_dispatch_launches_container_and_mirrors_exit_code(
     result = runner.invoke(app, ["dispatch", "--repo", "acme/widgets", "--issue", "7"])
 
     assert result.exit_code == 0
-    dispatch_mock.assert_called_once_with(settings, "acme", "widgets", 7)
+    dispatch_mock.assert_called_once_with(settings, "acme", "widgets", 7, dry_run=False)
+
+
+def test_cli_dispatch_forwards_dry_run_flag(mocker: MockerFixture) -> None:
+    settings = _stub_settings()
+    mocker.patch("resolv.main.get_settings", return_value=settings)
+    dispatch_mock = mocker.patch("resolv.main.dispatch_issue", return_value=0)
+
+    result = runner.invoke(
+        app, ["dispatch", "--repo", "acme/widgets", "--issue", "7", "--dry-run"]
+    )
+
+    assert result.exit_code == 0
+    dispatch_mock.assert_called_once_with(
+        settings, "acme", "widgets", 7, dry_run=True
+    )
 
 
 def test_cli_dispatch_propagates_container_failure(mocker: MockerFixture) -> None:

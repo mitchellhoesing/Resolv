@@ -114,6 +114,62 @@ def test_no_warning_when_diff_touches_source_only(
     assert "patch modifies test files" not in _read_run_log(state.workspace_path)
 
 
+def test_dry_run_opens_no_pr_and_touches_no_git(
+    mocker: MockerFixture, state: BlackboardState
+) -> None:
+    """Dry-run must skip every mutating step — no Repo, no push, no PR."""
+    fake_repo_cls = mocker.patch("resolv.nodes.deliver.Repo")
+    github = MagicMock()
+    state.current_diff = (
+        "--- a/src/widgets/parse.py\n+++ b/src/widgets/parse.py\n@@ -1 +1 @@\n-old\n+new\n"
+    )
+    state.test_output = "3 passed, 0 failed"
+
+    node = make_deliver_node(
+        github_client=github,
+        base_branch="main",
+        branch_prefix="resolv/issue-",
+        dry_run=True,
+    )
+    result = node(state)
+
+    fake_repo_cls.assert_not_called()
+    github.open_pull_request.assert_not_called()
+
+    output = result["test_output"]
+    assert output.startswith("DRY RUN")
+    assert "resolv/issue-7" in output
+    # The diff and test output the reviewer needs to see are both surfaced.
+    assert "--- a/src/widgets/parse.py" in output
+    assert "3 passed, 0 failed" in output
+
+    log_contents = _read_run_log(state.workspace_path)
+    assert "[deliver] dry-run: would open PR" in log_contents
+    assert "resolv/issue-7" in log_contents
+    assert "acme/widgets" in log_contents
+
+
+def test_dry_run_still_flags_test_file_edits(
+    mocker: MockerFixture, state: BlackboardState
+) -> None:
+    """The test-edit warning is a reviewer signal; dry-run needs it too."""
+    mocker.patch("resolv.nodes.deliver.Repo")
+    state.current_diff = (
+        "--- a/src/widgets/parse.py\n+++ b/src/widgets/parse.py\n@@ -1 +1 @@\n"
+        "--- a/tests/test_parse.py\n+++ b/tests/test_parse.py\n@@ -1 +1 @@\n"
+    )
+    github = MagicMock()
+
+    node = make_deliver_node(github_client=github, dry_run=True)
+    node(state)
+
+    log_contents = _read_run_log(state.workspace_path)
+    assert (
+        "[deliver] dry-run: patch modifies test files: tests/test_parse.py"
+        in log_contents
+    )
+
+
 def test_wraps_git_failure_in_delivery_error(
     mocker: MockerFixture, state: BlackboardState
 ) -> None:

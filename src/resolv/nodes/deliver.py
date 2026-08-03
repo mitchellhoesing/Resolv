@@ -12,6 +12,7 @@ from git import GitCommandError, Repo
 from resolv.adapters.github_client import GitHubClient
 from resolv.core.state import BlackboardState
 from resolv.exceptions import DeliveryError
+from resolv.utils.diff_stats import describe_diff
 from resolv.utils.run_log import log_event
 
 
@@ -20,10 +21,13 @@ def make_deliver_node(
     github_client: GitHubClient,
     base_branch: str = "main",
     branch_prefix: str = "resolv/issue-",
+    dry_run: bool = False,
 ) -> Callable[[BlackboardState], dict[str, Any]]:
     def deliver_node(state: BlackboardState) -> dict[str, Any]:
         branch_name = f"{branch_prefix}{state.issue.number}"
         commit_message = f"fix: resolve issue #{state.issue.number} — {state.issue.title}"
+        if dry_run:
+            return _dry_run_deliver(state, branch_name, base_branch, commit_message)
         log_event(
             f"[deliver] committing the passing patch to {branch_name} and pushing it "
             f"to {state.issue.owner}/{state.issue.repo}"
@@ -104,3 +108,40 @@ def _test_edit_warning(paths: list[str]) -> str:
         "rather than in the suite.\n"
         f"{listed}\n\n"
     )
+
+
+def _dry_run_deliver(
+    state: BlackboardState,
+    branch_name: str,
+    base_branch: str,
+    commit_message: str,
+) -> dict[str, Any]:
+    """Skip every mutating step — log the intended action and echo what would ship.
+
+    A dry-run must not touch git or GitHub: the whole point is validating the
+    coder's output before the operator grants write access. The diff and the
+    authoritative test output are already on the Blackboard by the time deliver
+    runs, so all this needs to do is surface them.
+    """
+    log_event(
+        f"[deliver] dry-run: would open PR from {branch_name} into {base_branch} "
+        f"on {state.issue.owner}/{state.issue.repo} "
+        f"({commit_message}); {describe_diff(state.current_diff)}"
+    )
+    edited_tests = _edited_test_paths(state.current_diff)
+    if edited_tests:
+        log_event(
+            f"[deliver] dry-run: patch modifies test files: {', '.join(edited_tests)}"
+        )
+    diff_block = state.current_diff or "(no diff)"
+    test_block = state.test_output or "(no test output)"
+    dry_run_output = (
+        "DRY RUN — no PR opened.\n\n"
+        f"Would open PR from {branch_name} into {base_branch} "
+        f"on {state.issue.owner}/{state.issue.repo}.\n\n"
+        "----- diff -----\n"
+        f"{diff_block}\n"
+        "----- test output -----\n"
+        f"{test_block}"
+    )
+    return {"test_output": dry_run_output}

@@ -40,7 +40,14 @@ CLI (runs the pipeline in-process; this is what executes inside the sandbox cont
 resolv run --repo owner/name --issue 123
 resolv run --repo owner/name --issue 123 --verbose   # full diff + test output in the summary
 resolv run --repo owner/name --issue 123 --workspace-root ./workspaces   # default: /workspace
+resolv run --repo owner/name --issue 123 --dry-run   # run the pipeline; print the diff instead of opening a PR
 ```
+
+Use `--dry-run` to validate Resolv's output on a sensitive issue before granting it PR
+write access: the pipeline runs end-to-end (context, install, code, test) and, on the
+authoritative PASSED verdict, the deliver node logs what it *would* have shipped and
+prints the diff plus the sandbox test output — no branch, no push, no PR. Available
+on `resolv dispatch` too (forwarded to the container).
 
 `resolv run` expects the container's environment: the test runner isolates the target
 suite with `unshare --net`, which needs Linux and `--cap-add=SYS_ADMIN`. On any other
