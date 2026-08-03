@@ -39,9 +39,17 @@ def host_log_directory(owner: str, repo: str, number: int) -> Path:
 
 
 def build_dispatch_command(
-    settings: Settings, owner: str, repo: str, number: int
+    settings: Settings,
+    owner: str,
+    repo: str,
+    number: int,
+    *,
+    dry_run: bool = False,
 ) -> list[str]:
     """Build the `docker run` argv for one issue. Secret values never appear here."""
+    resolv_args = ["run", "--repo", f"{owner}/{repo}", "--issue", str(number)]
+    if dry_run:
+        resolv_args.append("--dry-run")
     return [
         "docker", "run", "--rm", "--cap-add=SYS_ADMIN",
         "-e", "RESOLV_GITHUB_TOKEN",
@@ -49,15 +57,22 @@ def build_dispatch_command(
         "-e", "CLAUDE_CODE_OAUTH_TOKEN",
         "-v", f"{host_log_directory(owner, repo, number)}:{_CONTAINER_LOG_DIRECTORY}",
         settings.sandbox.image_tag,
-        "run", "--repo", f"{owner}/{repo}", "--issue", str(number),
+        *resolv_args,
     ]
 
 
-def dispatch_issue(settings: Settings, owner: str, repo: str, number: int) -> int:
+def dispatch_issue(
+    settings: Settings,
+    owner: str,
+    repo: str,
+    number: int,
+    *,
+    dry_run: bool = False,
+) -> int:
     """Run the per-issue container to completion and return its exit code."""
     # Docker would create the mount source as root-owned if it were missing.
     host_log_directory(owner, repo, number).mkdir(parents=True, exist_ok=True)
-    command = build_dispatch_command(settings, owner, repo, number)
+    command = build_dispatch_command(settings, owner, repo, number, dry_run=dry_run)
     env = {
         **os.environ,
         "RESOLV_GITHUB_TOKEN": settings.github_token.get_secret_value(),

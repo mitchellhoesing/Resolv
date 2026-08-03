@@ -49,7 +49,9 @@ def log_node_boundaries(node_name: str, node_fn: NodeFn) -> NodeFn:
     return logged_node
 
 
-def build_production_graph(settings: Settings | None = None) -> CompiledStateGraph:
+def build_production_graph(
+    settings: Settings | None = None, *, dry_run: bool = False
+) -> CompiledStateGraph:
     settings = settings or get_settings()
     # The coder agent runs the suite itself through the same sandboxed path the
     # test_runner node uses; wiring it here keeps `adapters` free of any import
@@ -87,6 +89,7 @@ def build_production_graph(settings: Settings | None = None) -> CompiledStateGra
                 github_client=github_client,
                 base_branch=settings.delivery.base_branch,
                 branch_prefix=settings.delivery.branch_prefix,
+                dry_run=dry_run,
             ),
         ),
         checkpointer=sqlite_checkpointer(checkpoint_database_path()),

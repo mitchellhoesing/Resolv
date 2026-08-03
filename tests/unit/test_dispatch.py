@@ -67,6 +67,33 @@ def test_dispatch_issue_creates_the_host_log_directory(mocker: MockerFixture) ->
     assert (Path("logs") / "acme__widgets__issue-7").is_dir()
 
 
+def test_build_dispatch_command_appends_dry_run_flag() -> None:
+    """--dry-run must reach the container's `resolv run` argv."""
+    command = build_dispatch_command(
+        _settings(), "acme", "widgets", 7, dry_run=True
+    )
+
+    assert command[-1] == "--dry-run"
+    # And the rest of the run invocation is otherwise unchanged.
+    assert command[-6:-1] == ["run", "--repo", "acme/widgets", "--issue", "7"]
+
+
+def test_build_dispatch_command_omits_dry_run_by_default() -> None:
+    command = build_dispatch_command(_settings(), "acme", "widgets", 7)
+
+    assert "--dry-run" not in command
+
+
+def test_dispatch_issue_forwards_dry_run_flag(mocker: MockerFixture) -> None:
+    run_mock = mocker.patch("resolv.dispatch.subprocess.run")
+    run_mock.return_value.returncode = 0
+
+    dispatch_issue(_settings(), "acme", "widgets", 7, dry_run=True)
+
+    command = run_mock.call_args.args[0]
+    assert command[-1] == "--dry-run"
+
+
 def test_dispatch_issue_injects_secrets_and_returns_exit_code(
     mocker: MockerFixture,
 ) -> None:
