@@ -11,7 +11,7 @@ from pytest_mock import MockerFixture
 
 from resolv.core.state import BlackboardState, IssueRef
 from resolv.exceptions import DeliveryError
-from resolv.nodes.deliver import make_deliver_node
+from resolv.nodes.deliver import make_deliver_node, make_dry_run_deliver_node
 
 
 def _read_run_log(tmp_path: Path) -> str:
@@ -112,6 +112,56 @@ def test_no_warning_when_diff_touches_source_only(
     assert "[!WARNING]" not in body
     assert body.startswith("Resolves #7")
     assert "patch modifies test files" not in _read_run_log(state.workspace_path)
+
+
+def test_dry_run_deliver_skips_git_and_github_and_reports_the_diff(
+    mocker: MockerFixture, state: BlackboardState
+) -> None:
+    """--dry-run must not touch git or GitHub; the diff still reaches the log."""
+    repo_cls = mocker.patch("resolv.nodes.deliver.Repo")
+    state.current_diff = (
+        "--- a/src/widgets/parse.py\n+++ b/src/widgets/parse.py\n@@ -1 +1 @@\n"
+    )
+
+    node = make_dry_run_deliver_node()
+    result = node(state)
+
+    repo_cls.assert_not_called()
+    assert result["test_output"] == "dry-run: PR skipped"
+    log_contents = _read_run_log(state.workspace_path)
+    assert "dry-run: skipping PR" in log_contents
+    assert "acme/widgets" in log_contents
+    assert "src/widgets/parse.py" in log_contents
+
+
+def test_dry_run_deliver_notes_a_missing_diff(
+    mocker: MockerFixture, state: BlackboardState
+) -> None:
+    """A run that produced no diff still deserves a comprehensible dry-run log line."""
+    mocker.patch("resolv.nodes.deliver.Repo")
+    state.current_diff = None
+
+    node = make_dry_run_deliver_node()
+    node(state)
+
+    log_contents = _read_run_log(state.workspace_path)
+    assert "no diff was produced" in log_contents
+
+
+def test_dry_run_deliver_flags_test_file_edits(
+    mocker: MockerFixture, state: BlackboardState
+) -> None:
+    """Warning about test-file edits is also useful in --dry-run."""
+    mocker.patch("resolv.nodes.deliver.Repo")
+    state.current_diff = (
+        "--- a/tests/test_parse.py\n+++ b/tests/test_parse.py\n@@ -1 +1 @@\n"
+    )
+
+    node = make_dry_run_deliver_node()
+    node(state)
+
+    log_contents = _read_run_log(state.workspace_path)
+    assert "patch modifies test files: tests/test_parse.py" in log_contents
 
 
 def test_wraps_git_failure_in_delivery_error(

@@ -12,6 +12,7 @@ from git import GitCommandError, Repo
 from resolv.adapters.github_client import GitHubClient
 from resolv.core.state import BlackboardState
 from resolv.exceptions import DeliveryError
+from resolv.utils.diff_stats import describe_diff
 from resolv.utils.run_log import log_event
 
 
@@ -94,6 +95,36 @@ def _is_test_path(path: str) -> bool:
         or target.name.startswith("test_")
         or target.name.endswith("_test.py")
     )
+
+
+def make_dry_run_deliver_node() -> Callable[[BlackboardState], dict[str, Any]]:
+    """Stand-in for the deliver node used in --dry-run mode.
+
+    Runs after test_runner has produced its verdict, so the diff and test output
+    are already on the Blackboard; this node prints/logs them and returns without
+    touching git or GitHub. The pipeline's overall shape is unchanged — the run
+    still ends at the same node — so `resolv inspect` reads it the same way.
+    """
+
+    def dry_run_deliver_node(state: BlackboardState) -> dict[str, Any]:
+        log_event(
+            f"[deliver] dry-run: skipping PR for issue "
+            f"#{state.issue.number} ({state.issue.owner}/{state.issue.repo}); "
+            f"{describe_diff(state.current_diff)}"
+        )
+        if state.current_diff:
+            log_event("[deliver] dry-run diff (would have been submitted):")
+            log_event(state.current_diff)
+        else:
+            log_event("[deliver] dry-run: no diff was produced")
+        edited_tests = _edited_test_paths(state.current_diff)
+        if edited_tests:
+            log_event(
+                f"[deliver] dry-run: patch modifies test files: {', '.join(edited_tests)}"
+            )
+        return {"test_output": "dry-run: PR skipped"}
+
+    return dry_run_deliver_node
 
 
 def _test_edit_warning(paths: list[str]) -> str:

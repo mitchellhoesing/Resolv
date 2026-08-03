@@ -40,7 +40,14 @@ CLI (runs the pipeline in-process; this is what executes inside the sandbox cont
 resolv run --repo owner/name --issue 123
 resolv run --repo owner/name --issue 123 --verbose   # full diff + test output in the summary
 resolv run --repo owner/name --issue 123 --workspace-root ./workspaces   # default: /workspace
+resolv run --repo owner/name --issue 123 --dry-run   # run everything except opening the PR
 ```
+
+`--dry-run` executes the full pipeline (fetch → env → code → test → validate) but
+swaps the deliver node for one that logs the diff and skips the branch/commit/push
+and PR — useful for validating Resolv's output on sensitive or self-referential
+issues before granting it write access. `resolv dispatch --dry-run` forwards the
+flag through to the in-container `resolv run`.
 
 `resolv run` expects the container's environment: the test runner isolates the target
 suite with `unshare --net`, which needs Linux and `--cap-add=SYS_ADMIN`. On any other
@@ -50,6 +57,7 @@ host the run reaches `test_runner` and fails there with a `SandboxError`. Use
 Manually launch one disposable per-issue container from the host (same `docker run` the webhook uses):
 ```bash
 resolv dispatch --repo owner/name --issue 123
+resolv dispatch --repo owner/name --issue 123 --dry-run   # skip PR opening (forwarded to `resolv run`)
 ```
 
 Replay a finished run's state, node by node (see [State history](#state-history)):

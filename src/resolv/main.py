@@ -120,6 +120,14 @@ def run(
         "--verbose",
         help="Include the full diff and test output in the run summary.",
     ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help=(
+            "Run the full pipeline but skip opening a PR; log the diff and "
+            "test output instead. Useful for sensitive or self-referential issues."
+        ),
+    ),
 ) -> None:
     """Run the pipeline in-process for a single issue (inside the sandbox container)."""
     owner, name = _split_repo(repo)
@@ -131,13 +139,14 @@ def run(
     workspace_path = workspace_root / f"{owner}__{name}__issue-{issue}"
     initial_state = BlackboardState(issue=issue_ref, workspace_path=workspace_path)
 
-    graph = build_production_graph(settings)
+    graph = build_production_graph(settings, dry_run=dry_run)
     # The compiled graph is checkpointed, so a thread id is mandatory; it also
     # keys the state history for post-run inspection.
     run_marker = new_run_marker()
     # The only place the log and the state history name the same run, so it is
     # what lets a log file be traced back to its checkpoints.
-    log_event(f"[run] {owner}/{name}#{issue} run {run_marker}")
+    dry_run_marker = " (dry-run)" if dry_run else ""
+    log_event(f"[run] {owner}/{name}#{issue} run {run_marker}{dry_run_marker}")
     run_config: RunnableConfig = {
         "configurable": {"thread_id": thread_id_for(owner, name, issue, run_marker)}
     }
@@ -151,8 +160,10 @@ def run(
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(1) from exc
 
-    # Both outcomes want the audit trail, and a stalled run wants it most.
-    log_event(render_run_summary(final_state, verbose))
+    # Both outcomes want the audit trail, and a stalled run wants it most. A
+    # dry-run promotes verbose: the whole point is to see the diff and output
+    # the run would have submitted.
+    log_event(render_run_summary(final_state, verbose or dry_run))
 
     if final_state.get("test_status") == "PASSED":
         typer.echo(final_state.get("test_output") or "PR opened")
@@ -328,11 +339,16 @@ def inspect(
 def dispatch(
     repo: str = typer.Option(..., "--repo", help="Target repository as owner/name."),
     issue: int = typer.Option(..., "--issue", help="Issue number to resolve."),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Forward --dry-run to the in-container `resolv run` (see `run --help`).",
+    ),
 ) -> None:
     """Launch a disposable per-issue container that runs `resolv run` (host-side)."""
     owner, name = _split_repo(repo)
     settings = get_settings()
-    exit_code = dispatch_issue(settings, owner, name, issue)
+    exit_code = dispatch_issue(settings, owner, name, issue, dry_run=dry_run)
     raise typer.Exit(exit_code)
 
 

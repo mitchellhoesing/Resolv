@@ -83,3 +83,30 @@ def test_dispatch_issue_injects_secrets_and_returns_exit_code(
     assert kwargs["env"]["RESOLV_GITHUB_TOKEN"] == "ghp_secret"
     assert kwargs["env"]["RESOLV_ANTHROPIC_API_KEY"] == "sk-secret"
     assert kwargs["env"]["CLAUDE_CODE_OAUTH_TOKEN"] == "oauth_secret"
+
+
+def test_build_dispatch_command_forwards_dry_run_flag() -> None:
+    """`resolv dispatch --dry-run` must reach the in-container `resolv run`."""
+    command = build_dispatch_command(
+        _settings(), "acme", "widgets", 7, dry_run=True
+    )
+
+    assert command[-6:] == [
+        "run", "--repo", "acme/widgets", "--issue", "7", "--dry-run"
+    ]
+
+
+def test_build_dispatch_command_omits_dry_run_flag_by_default() -> None:
+    command = build_dispatch_command(_settings(), "acme", "widgets", 7)
+
+    assert "--dry-run" not in command
+
+
+def test_dispatch_issue_forwards_dry_run_flag(mocker: MockerFixture) -> None:
+    run_mock = mocker.patch("resolv.dispatch.subprocess.run")
+    run_mock.return_value.returncode = 0
+
+    dispatch_issue(_settings(), "acme", "widgets", 7, dry_run=True)
+
+    command = run_mock.call_args.args[0]
+    assert "--dry-run" in command
