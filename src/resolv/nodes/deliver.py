@@ -12,6 +12,7 @@ from git import GitCommandError, Repo
 from resolv.adapters.github_client import GitHubClient
 from resolv.core.state import BlackboardState
 from resolv.exceptions import DeliveryError
+from resolv.utils.diff_stats import describe_diff
 from resolv.utils.run_log import log_event
 
 
@@ -104,3 +105,41 @@ def _test_edit_warning(paths: list[str]) -> str:
         "rather than in the suite.\n"
         f"{listed}\n\n"
     )
+
+
+def make_dry_run_deliver_node() -> Callable[[BlackboardState], dict[str, Any]]:
+    """Deliver-node replacement that logs the diff and test output without opening a PR.
+
+    Used by `--dry-run`: the pipeline runs end to end — clone, install, code, test —
+    but this final node stops short of touching the upstream, so the same fix can
+    be validated on a sensitive or self-referential issue before write access is
+    granted. What would have been submitted is written to the run log, and the
+    edited-test warning still fires so a dry run surfaces the same red flag a
+    real delivery would.
+    """
+
+    def dry_run_deliver_node(state: BlackboardState) -> dict[str, Any]:
+        diff = state.current_diff
+        log_event(
+            f"[deliver] dry-run: skipping PR for {state.issue.owner}/{state.issue.repo}"
+            f"#{state.issue.number}; {describe_diff(diff)}"
+        )
+        edited_tests = _edited_test_paths(diff)
+        if edited_tests:
+            log_event(
+                f"[deliver] dry-run: patch modifies test files: {', '.join(edited_tests)}"
+            )
+        for line in _labelled_block("diff", diff):
+            log_event(line)
+        for line in _labelled_block("test output", state.test_output):
+            log_event(line)
+        return {"test_output": f"dry-run: PR not opened for issue #{state.issue.number}"}
+
+    return dry_run_deliver_node
+
+
+def _labelled_block(label: str, content: str | None) -> list[str]:
+    """Format one labelled block of captured content for the run log."""
+    if not content:
+        return [f"[deliver] dry-run {label}: (empty)"]
+    return [f"[deliver] dry-run {label}:", *content.splitlines()]

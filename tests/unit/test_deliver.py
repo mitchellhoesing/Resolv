@@ -11,7 +11,7 @@ from pytest_mock import MockerFixture
 
 from resolv.core.state import BlackboardState, IssueRef
 from resolv.exceptions import DeliveryError
-from resolv.nodes.deliver import make_deliver_node
+from resolv.nodes.deliver import make_deliver_node, make_dry_run_deliver_node
 
 
 def _read_run_log(tmp_path: Path) -> str:
@@ -127,3 +127,51 @@ def test_wraps_git_failure_in_delivery_error(
         node(state)
     github.open_pull_request.assert_not_called()
     assert "[deliver] error: git operation failed" in _read_run_log(state.workspace_path)
+
+
+def test_dry_run_deliver_logs_diff_and_test_output_without_opening_pr(
+    state: BlackboardState,
+) -> None:
+    state.current_diff = (
+        "diff --git a/src/x.py b/src/x.py\n"
+        "--- a/src/x.py\n+++ b/src/x.py\n@@ -1 +1 @@\n-old\n+new\n"
+    )
+    state.test_output = "4 passed, 0 failed"
+
+    result = make_dry_run_deliver_node()(state)
+
+    assert result["test_output"] == "dry-run: PR not opened for issue #7"
+    log_contents = _read_run_log(state.workspace_path)
+    # Sentinel that a reviewer can grep the log for.
+    assert "dry-run: skipping PR" in log_contents
+    # Both artefacts the reviewer needs to validate the run are surfaced.
+    assert "+new" in log_contents
+    assert "4 passed, 0 failed" in log_contents
+
+
+def test_dry_run_deliver_warns_when_diff_touches_tests(
+    state: BlackboardState,
+) -> None:
+    """The same red flag a real delivery raises must still fire in a dry run."""
+    state.current_diff = (
+        "--- a/tests/test_parse.py\n+++ b/tests/test_parse.py\n@@ -1 +1 @@\n"
+    )
+
+    make_dry_run_deliver_node()(state)
+
+    log_contents = _read_run_log(state.workspace_path)
+    assert (
+        "[deliver] dry-run: patch modifies test files: tests/test_parse.py"
+        in log_contents
+    )
+
+
+def test_dry_run_deliver_handles_a_run_that_produced_no_diff(
+    state: BlackboardState,
+) -> None:
+    result = make_dry_run_deliver_node()(state)
+
+    assert result["test_output"] == "dry-run: PR not opened for issue #7"
+    log_contents = _read_run_log(state.workspace_path)
+    assert "no files changed" in log_contents
+    assert "dry-run diff: (empty)" in log_contents

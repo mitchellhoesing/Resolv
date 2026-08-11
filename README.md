@@ -40,7 +40,14 @@ CLI (runs the pipeline in-process; this is what executes inside the sandbox cont
 resolv run --repo owner/name --issue 123
 resolv run --repo owner/name --issue 123 --verbose   # full diff + test output in the summary
 resolv run --repo owner/name --issue 123 --workspace-root ./workspaces   # default: /workspace
+resolv run --repo owner/name --issue 123 --dry-run   # skip PR; log diff + test output
 ```
+
+`--dry-run` runs the whole pipeline — fetch, clone, install, code, test — but stops
+short of pushing a branch or opening a PR. The diff and sandbox test output that
+would have been submitted are written to the run log instead, which is what makes
+it safe to validate Resolv's output on sensitive or self-referential issues
+before granting write access to open PRs against the target repo.
 
 `resolv run` expects the container's environment: the test runner isolates the target
 suite with `unshare --net`, which needs Linux and `--cap-add=SYS_ADMIN`. On any other

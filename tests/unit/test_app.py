@@ -79,6 +79,47 @@ def test_build_production_graph_wraps_every_node_with_logging(
     ]
 
 
+def test_build_production_graph_dry_run_swaps_the_deliver_node(
+    mocker: MockerFixture,
+) -> None:
+    """`--dry-run` must reach the graph as a different deliver node, not just a flag."""
+    mocker.patch("resolv.core.app.GitHubClient", return_value=MagicMock())
+    mocker.patch("resolv.core.app.ClaudeCodeBackend", return_value=MagicMock())
+    mocker.patch("resolv.core.app.ClaudeCodeClient", return_value=MagicMock())
+    mocker.patch("resolv.core.app.build_graph", return_value=MagicMock())
+    real_deliver = mocker.patch(
+        "resolv.core.app.make_deliver_node", return_value=MagicMock()
+    )
+    dry_deliver = mocker.patch(
+        "resolv.core.app.make_dry_run_deliver_node", return_value=MagicMock()
+    )
+
+    build_production_graph(_patched_settings(), dry_run=True)
+
+    dry_deliver.assert_called_once_with()
+    real_deliver.assert_not_called()
+
+
+def test_build_production_graph_defaults_to_the_live_deliver_node(
+    mocker: MockerFixture,
+) -> None:
+    mocker.patch("resolv.core.app.GitHubClient", return_value=MagicMock())
+    mocker.patch("resolv.core.app.ClaudeCodeBackend", return_value=MagicMock())
+    mocker.patch("resolv.core.app.ClaudeCodeClient", return_value=MagicMock())
+    mocker.patch("resolv.core.app.build_graph", return_value=MagicMock())
+    real_deliver = mocker.patch(
+        "resolv.core.app.make_deliver_node", return_value=MagicMock()
+    )
+    dry_deliver = mocker.patch(
+        "resolv.core.app.make_dry_run_deliver_node", return_value=MagicMock()
+    )
+
+    build_production_graph(_patched_settings())
+
+    real_deliver.assert_called_once()
+    dry_deliver.assert_not_called()
+
+
 def test_log_node_boundaries_brackets_the_node_with_start_and_duration(
     sample_state: BlackboardState, mocker: MockerFixture
 ) -> None:

@@ -143,6 +143,70 @@ def test_cli_prints_run_summary_on_the_stall_path(mocker: MockerFixture) -> None
     assert "Coder agent did not reach a passing suite" in result.output
 
 
+def test_cli_dry_run_flag_wires_the_no_pr_deliver_node(
+    mocker: MockerFixture,
+) -> None:
+    """--dry-run must reach `build_production_graph` so the deliver node changes."""
+    mocker.patch("resolv.main.get_settings", return_value=_stub_settings())
+    github = MagicMock()
+    github.fetch_issue.return_value = IssueRef(
+        owner="a", repo="b", number=1, title="t", body="", labels=()
+    )
+    mocker.patch("resolv.main.GitHubClient", return_value=github)
+    graph = MagicMock()
+    graph.invoke.return_value = {
+        "test_status": "PASSED",
+        "test_output": "dry-run: PR not opened for issue #1",
+    }
+    builder = mocker.patch("resolv.main.build_production_graph", return_value=graph)
+
+    result = runner.invoke(app, ["run", "--repo", "a/b", "--issue", "1", "--dry-run"])
+
+    assert result.exit_code == 0
+    # The keyword arg is what the deliver-node swap keys on; assert on that
+    # rather than on the resulting log text, which the mocked graph never emits.
+    assert builder.call_args.kwargs.get("dry_run") is True
+    assert "dry-run: PR not opened" in result.output
+
+
+def test_cli_run_without_dry_run_flag_passes_false_to_builder(
+    mocker: MockerFixture,
+) -> None:
+    """The dry-run flag is opt-in: without it, the pipeline is live."""
+    mocker.patch("resolv.main.get_settings", return_value=_stub_settings())
+    github = MagicMock()
+    github.fetch_issue.return_value = IssueRef(
+        owner="a", repo="b", number=1, title="t", body="", labels=()
+    )
+    mocker.patch("resolv.main.GitHubClient", return_value=github)
+    graph = MagicMock()
+    graph.invoke.return_value = {"test_status": "PASSED", "test_output": "ok"}
+    builder = mocker.patch("resolv.main.build_production_graph", return_value=graph)
+
+    runner.invoke(app, ["run", "--repo", "a/b", "--issue", "1"])
+
+    assert builder.call_args.kwargs.get("dry_run") is False
+
+
+def test_cli_dry_run_marker_appears_in_the_run_log(mocker: MockerFixture) -> None:
+    """The opening [run] line must say the run cannot produce a PR."""
+    mocker.patch("resolv.main.get_settings", return_value=_stub_settings())
+    github = MagicMock()
+    github.fetch_issue.return_value = IssueRef(
+        owner="a", repo="b", number=1, title="t", body="", labels=()
+    )
+    mocker.patch("resolv.main.GitHubClient", return_value=github)
+    graph = MagicMock()
+    graph.invoke.return_value = {"test_status": "PASSED", "test_output": "ok"}
+    mocker.patch("resolv.main.build_production_graph", return_value=graph)
+    log_event = mocker.patch("resolv.main.log_event")
+
+    runner.invoke(app, ["run", "--repo", "a/b", "--issue", "1", "--dry-run"])
+
+    logged = "\n".join(str(call.args[0]) for call in log_event.call_args_list)
+    assert "(dry-run)" in logged
+
+
 def test_cli_verbose_flag_expands_the_summary(mocker: MockerFixture) -> None:
     mocker.patch("resolv.main.get_settings", return_value=_stub_settings())
     github = MagicMock()

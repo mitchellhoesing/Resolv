@@ -120,6 +120,14 @@ def run(
         "--verbose",
         help="Include the full diff and test output in the run summary.",
     ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help=(
+            "Run the full pipeline but skip opening the PR — log the diff and "
+            "test results that would have been submitted instead."
+        ),
+    ),
 ) -> None:
     """Run the pipeline in-process for a single issue (inside the sandbox container)."""
     owner, name = _split_repo(repo)
@@ -131,13 +139,16 @@ def run(
     workspace_path = workspace_root / f"{owner}__{name}__issue-{issue}"
     initial_state = BlackboardState(issue=issue_ref, workspace_path=workspace_path)
 
-    graph = build_production_graph(settings)
+    graph = build_production_graph(settings, dry_run=dry_run)
     # The compiled graph is checkpointed, so a thread id is mandatory; it also
     # keys the state history for post-run inspection.
     run_marker = new_run_marker()
     # The only place the log and the state history name the same run, so it is
-    # what lets a log file be traced back to its checkpoints.
-    log_event(f"[run] {owner}/{name}#{issue} run {run_marker}")
+    # what lets a log file be traced back to its checkpoints. Dry-run mode is
+    # called out here so the log's opening line makes clear the run cannot
+    # produce a PR.
+    mode_label = " (dry-run)" if dry_run else ""
+    log_event(f"[run] {owner}/{name}#{issue} run {run_marker}{mode_label}")
     run_config: RunnableConfig = {
         "configurable": {"thread_id": thread_id_for(owner, name, issue, run_marker)}
     }
