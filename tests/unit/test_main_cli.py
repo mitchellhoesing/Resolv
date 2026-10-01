@@ -9,6 +9,7 @@ from pydantic import SecretStr
 from pytest_mock import MockerFixture
 from typer.testing import CliRunner
 
+import resolv.main as main_module
 from resolv.config import Settings
 from resolv.core.graph import build_graph, sqlite_checkpointer
 from resolv.core.state import BlackboardState, IssueRef
@@ -358,3 +359,34 @@ def test_cli_dispatch_propagates_container_failure(mocker: MockerFixture) -> Non
     result = runner.invoke(app, ["dispatch", "--repo", "acme/widgets", "--issue", "7"])
 
     assert result.exit_code == 17
+
+
+def test_cli_dry_run_reports_diff_and_tests_on_success_and_failure(
+    mocker: MockerFixture,
+) -> None:
+    mocker.patch("resolv.main.get_settings", return_value=_stub_settings())
+    github = mocker.patch("resolv.main.GitHubClient").return_value
+    github.fetch_issue.return_value = IssueRef(owner="a", repo="b", number=1, title="t")
+    graph = mocker.patch("resolv.main.build_production_graph").return_value
+    log = mocker.spy(main_module, "log_event")
+
+    for status, exit_code in [("PASSED", 0), ("FAILED", 1)]:
+        graph.invoke.return_value = _finished_run(status)
+        result = runner.invoke(app, ["run", "--repo", "a/b", "--issue", "1", "--dry-run"])
+        assert result.exit_code == exit_code
+        assert graph.invoke.call_args.args[0].dry_run is True
+        assert "--- a/x" in result.output
+        assert "1 failed" in result.output
+        assert "no PR opened" in result.output
+        assert "--- a/x" in log.call_args_list[-1].args[0]
+
+
+def test_cli_dispatch_forwards_dry_run(mocker: MockerFixture) -> None:
+    settings = _stub_settings()
+    mocker.patch("resolv.main.get_settings", return_value=settings)
+    dispatch = mocker.patch("resolv.main.dispatch_issue", return_value=0)
+    result = runner.invoke(app, [
+        "dispatch", "--repo", "acme/widgets", "--issue", "7", "--dry-run"
+    ])
+    assert result.exit_code == 0
+    dispatch.assert_called_once_with(settings, "acme", "widgets", 7, dry_run=True)

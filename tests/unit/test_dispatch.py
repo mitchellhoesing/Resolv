@@ -83,3 +83,12 @@ def test_dispatch_issue_injects_secrets_and_returns_exit_code(
     assert kwargs["env"]["RESOLV_GITHUB_TOKEN"] == "ghp_secret"
     assert kwargs["env"]["RESOLV_ANTHROPIC_API_KEY"] == "sk-secret"
     assert kwargs["env"]["CLAUDE_CODE_OAUTH_TOKEN"] == "oauth_secret"
+
+
+def test_dispatch_dry_run_reaches_container(mocker: MockerFixture) -> None:
+    run = mocker.patch("resolv.dispatch.subprocess.run")
+    run.return_value.returncode = 0
+    assert dispatch_issue(_settings(), "acme", "widgets", 7, dry_run=True) == 0
+    command = run.call_args.args[0]
+    assert command[-6:] == ["run", "--repo", "acme/widgets", "--issue", "7", "--dry-run"]
+    assert "--dry-run" not in build_dispatch_command(_settings(), "acme", "widgets", 7)

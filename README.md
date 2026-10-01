@@ -38,6 +38,7 @@ RESOLV_CODER__MAX_TURNS=90 RESOLV_SANDBOX__TEST_TIMEOUT_SECONDS=900 resolv run .
 CLI (runs the pipeline in-process; this is what executes inside the sandbox container):
 ```bash
 resolv run --repo owner/name --issue 123
+resolv run --repo owner/name --issue 123 --dry-run
 resolv run --repo owner/name --issue 123 --verbose   # full diff + test output in the summary
 resolv run --repo owner/name --issue 123 --workspace-root ./workspaces   # default: /workspace
 ```
@@ -50,7 +51,15 @@ host the run reaches `test_runner` and fails there with a `SandboxError`. Use
 Manually launch one disposable per-issue container from the host (same `docker run` the webhook uses):
 ```bash
 resolv dispatch --repo owner/name --issue 123
+resolv dispatch --repo owner/name --issue 123 --dry-run
 ```
+
+`--dry-run` runs issue fetching, fix generation, and sandbox validation, then stops
+before delivery. It creates no delivery branch or commit, pushes nothing, and opens
+no PR. The full generated diff and captured sandbox test output are printed and
+saved in the run log without requiring `--verbose`. Passing tests return exit code
+0; failed validation still returns a non-zero exit code. Issue and repository read
+access and Claude credentials are still required.
 
 Replay a finished run's state, node by node (see [State history](#state-history)):
 ```bash
@@ -85,7 +94,7 @@ The coder agent runs the suite itself mid-session through `run_tests`, so severa
 `[coder-agent]` turns appear before the single authoritative `[test_runner]` line.
 
 Diff and test-suite output are reported by counts, never inlined — the content
-itself stays out of the log unless you pass `--verbose`.
+itself stays out of the log unless you pass `--verbose` or `--dry-run`.
 
 A run ends with a one-line summary:
 
