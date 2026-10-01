@@ -174,3 +174,27 @@ def test_state_history_exposes_every_node_boundary(
     assert any(
         snapshot.values.get("test_status") == "PENDING" for snapshot in snapshots
     )
+
+
+@pytest.mark.parametrize("status", ["PASSED", "FAILED"])
+def test_dry_run_validates_without_delivery(
+    initial_state: BlackboardState, mocker: MockerFixture, status: str
+) -> None:
+    initial_state.dry_run = True
+    deliver = mocker.Mock(side_effect=AssertionError("delivery must not run"))
+    diff = "--- a/x\n+++ b/x\n-old\n+new\n"
+    app = build_graph(**_default_wiring(
+        coder_fn=lambda state: {"current_diff": diff},
+        test_runner_fn=lambda state: {"test_status": status, "test_output": "suite output"},
+        deliver_fn=deliver,
+    ))
+    config = _config()
+    final = app.invoke(initial_state, config=config)
+
+    assert final["current_diff"] == diff
+    assert final["test_status"] == status
+    assert final["test_output"] == "suite output"
+    assert _executed_path(app, config) == [
+        "context_broker", "env_installer", "coder", "test_runner"
+    ]
+    deliver.assert_not_called()

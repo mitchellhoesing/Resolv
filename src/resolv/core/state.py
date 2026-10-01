@@ -25,6 +25,7 @@ class BlackboardState(BaseModel):
 
     issue: IssueRef
     workspace_path: Path
+    dry_run: bool = False
     current_diff: str | None = None
     test_status: TestStatus = "PENDING"
     test_output: str | None = None

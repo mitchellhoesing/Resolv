@@ -3,6 +3,7 @@
 The graph wires:
 
     START -> context_broker -> env_installer -> coder -> test_runner -> gate
+    gate -> END                                     (dry run)
     gate -> deliver -> END                          (tests PASSED)
     gate -> END                                     (stall — caller reports the failure)
 
@@ -66,11 +67,15 @@ def sqlite_checkpointer(database_path: Path) -> SqliteSaver:
 
 GATE_DELIVER = "deliver"
 GATE_STALL = "stall"
+GATE_DRY_RUN = "dry-run"
 
 
 def gate_router(state: BlackboardState) -> str:
-    """Route on the authoritative verdict: deliver on PASSED, otherwise stall."""
-    decision = GATE_DELIVER if state.test_status == "PASSED" else GATE_STALL
+    """Stop dry runs after validation; otherwise deliver on PASSED or stall."""
+    if state.dry_run:
+        decision = GATE_DRY_RUN
+    else:
+        decision = GATE_DELIVER if state.test_status == "PASSED" else GATE_STALL
     log_event(f"[gate] {decision} (test {state.test_status})")
     return decision
 
@@ -105,6 +110,7 @@ def build_graph(
         {
             GATE_DELIVER: "deliver",
             GATE_STALL: END,
+            GATE_DRY_RUN: END,
         },
     )
     graph.add_edge("deliver", END)
